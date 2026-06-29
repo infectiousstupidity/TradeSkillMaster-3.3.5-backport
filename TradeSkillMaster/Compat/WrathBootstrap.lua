@@ -631,6 +631,36 @@ if not _G.date then
 end
 
 -- ============================================================================
+-- SetLanguageForAllChatTabs — missing on 3.3.5 (added later in retail).
+-- WeakAuras auras and other scripts call this global. Polyfill it so they
+-- don't error out when it's nil.
+-- ============================================================================
+
+do
+	local function SetLanguageForAllChatTabs_Impl(lang)
+		if not lang or lang == "" then return end
+		if not GetNumLanguages or not GetLanguageByIndex or not NUM_CHAT_WINDOWS then return end
+		local targetLang, targetID
+		for i = 1, GetNumLanguages() do
+			local name, id = GetLanguageByIndex(i)
+			if name == lang then targetLang, targetID = name, id break end
+		end
+		if not targetLang then return end
+		for i = 1, NUM_CHAT_WINDOWS do
+			local cf = _G["ChatFrame" .. i]
+			if cf and cf.editBox then
+				cf.editBox.language = targetLang
+				if targetID then cf.editBox.languageID = targetID end
+			end
+		end
+	end
+
+	if type(_G.SetLanguageForAllChatTabs) ~= "function" then
+		_G.SetLanguageForAllChatTabs = SetLanguageForAllChatTabs_Impl
+	end
+end
+
+-- ============================================================================
 -- Blizzard_DebugTools ScriptErrorsFrame guard.
 -- On 3.3.5a the stock error display is buggy: ScriptErrorsFrame_Update (line ~432)
 -- can call format() with a nil argument and throw, which cascades into a crash
