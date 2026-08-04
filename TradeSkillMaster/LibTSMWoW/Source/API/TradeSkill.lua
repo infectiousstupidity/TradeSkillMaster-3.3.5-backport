@@ -249,7 +249,7 @@ function TradeSkill.GetName()
 		local info = C_TradeSkillUI.GetBaseProfessionInfo()
 		return info.parentProfessionName or info.professionName, info.profession
 	else
-		local name = TradeSkill.IsClassicCrafting() and GetCraftSkillLine(1) or GetTradeSkillLine()
+		local name = TradeSkill.IsClassicCrafting() and GetCraftSkillLine and GetCraftSkillLine(1) or GetTradeSkillLine()
 		return name
 	end
 end

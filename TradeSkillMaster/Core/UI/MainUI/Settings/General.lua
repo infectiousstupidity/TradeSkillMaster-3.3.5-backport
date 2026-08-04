@@ -58,8 +58,8 @@ local SETTING_TOOLTIPS = {
 	auctionDBAltRealm = L["Loads AuctionDB data for an additional realm for display in the tooltip."],
 	language = L["Overrides the language TSM uses for its interface. 'Auto' uses your game client's language. Changing this requires reloading your UI."],
 }
-local LANGUAGE_LIST = { L["Auto (game default)"], "English", "Русский" }
-local LANGUAGE_KEYS = { "auto", "enUS", "ruRU" }
+local LANGUAGE_LIST = { L["Auto (game default)"], "English", "简体中文", "繁體中文", "Русский" }
+local LANGUAGE_KEYS = { "auto", "enUS", "zhCN", "zhTW", "ruRU" }
 
 
 

@@ -1143,12 +1143,13 @@ function private.EventHandler(eventName, ...)
 		local genericEventArg = select(GENERIC_EVENTS[eventName], ...)
 		assert(genericEventArg)
 		genericEventArg = tostring(genericEventArg)
-		-- 3.3.5: a buyout's "You won an auction for X" message carries the item name, so it
-		-- won't hit a fixed key; remap it to the synthetic won token so PlaceAuctionBid resolves.
-		if eventName == "CHAT_MSG_SYSTEM" and not private.events[eventName][genericEventArg] and private.IsAuctionWonMessage(genericEventArg) then
-			genericEventArg = AUCTION_WON_TOKEN
-		elseif eventName == "CHAT_MSG_SYSTEM" and not private.events[eventName][genericEventArg] and (strfind(genericEventArg or "", "won") or strfind(genericEventArg or "", "auction")) then
-			genericEventArg = AUCTION_WON_TOKEN
+		-- 3.3.5: multi-language & server-side ERR_AUCTION_STARTED message matching
+		if eventName == "CHAT_MSG_SYSTEM" and not private.events[eventName][genericEventArg] then
+			if genericEventArg == ERR_AUCTION_STARTED or genericEventArg == "Auction created." or genericEventArg == "拍卖物品已创造。" or genericEventArg == "拍賣物品已創造。" or genericEventArg == "Аукцион создан." or strfind(genericEventArg or "", "created") or strfind(genericEventArg or "", "已创造") or strfind(genericEventArg or "", "已創造") then
+				genericEventArg = ERR_AUCTION_STARTED
+			elseif private.IsAuctionWonMessage(genericEventArg) or (strfind(genericEventArg or "", "won") or strfind(genericEventArg or "", "auction")) then
+				genericEventArg = AUCTION_WON_TOKEN
+			end
 		end
 		if (ClientInfo.IsRetail() and issecretvalue(genericEventArg)) or not private.events[eventName][genericEventArg] then
 			return
@@ -1168,7 +1169,24 @@ function private.ResponseReceivedHandler(eventName, ...)
 end
 
 function private.UnusedEventHandler(eventName, ...)
-	Log.Info("%s (%s)", eventName, private.ArgsToStr(...))
+end
+
+function private.CheckAllIdle()
+	local now = GetTime()
+	for apiName, wrapper in pairs(private.wrappers) do
+		if not wrapper:IsIdle() then
+			-- 3.3.5: Auto-release any wrapper stuck in PENDING state for over 1.5s
+			-- to prevent Post/Query buttons from becoming unclickable ("点不动").
+			if wrapper._callTime and (now - wrapper._callTime) > 1.5 then
+				Log.Warn("Auto-releasing stuck wrapper (%s, callTime %.2fs ago)", apiName, now - wrapper._callTime)
+				wrapper:CancelIfPending()
+			else
+				Log.Err("Another wrapper is pending (%s)", apiName)
+				return false
+			end
+		end
+	end
+	return true
 end
 
 function private.EventHandlerHelper(wrappers, eventName, ...)

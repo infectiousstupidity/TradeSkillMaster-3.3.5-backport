@@ -79,7 +79,7 @@ end
 ---@return string
 function Locale.GetLanguageKey()
 	local override = _G.TSMLocaleOverride
-	if override == "enUS" or override == "ruRU" or override == "auto" then
+	if override == "enUS" or override == "zhCN" or override == "zhTW" or override == "ruRU" or override == "deDE" or override == "esES" or override == "esMX" or override == "frFR" or override == "itIT" or override == "koKR" or override == "ptBR" or override == "auto" then
 		return override
 	end
 	return "auto"
@@ -87,7 +87,7 @@ end
 
 ---Saves the language selection (account-wide) for use on the next load.
 function Locale.SetLanguageKey(key)
-	if key ~= "enUS" and key ~= "ruRU" then
+	if key ~= "enUS" and key ~= "zhCN" and key ~= "zhTW" and key ~= "ruRU" and key ~= "deDE" and key ~= "esES" and key ~= "esMX" and key ~= "frFR" and key ~= "itIT" and key ~= "koKR" and key ~= "ptBR" then
 		key = "auto"
 	end
 	_G.TSMLocaleOverride = key
@@ -119,13 +119,19 @@ do
 	-- ADDON_LOADED (SavedVariables aren't loaded yet at file-load time).
 	private.activeLocale = private.locale
 
-	-- ElvUI-style approach: load every selectable locale into memory so we can
-	-- switch between them at runtime without needing the saved choice at
-	-- file-load. We load enUS (the base/fallback), ruRU (offered in Settings),
-	-- and the game client's locale (used by the "Auto" option).
+	-- Load all available locales into memory or based on client locale
 	private.loadLocales = {
 		enUS = true,
+		zhCN = true,
+		zhTW = true,
 		ruRU = true,
+		deDE = true,
+		esES = true,
+		esMX = true,
+		frFR = true,
+		itIT = true,
+		koKR = true,
+		ptBR = true,
 		[private.locale] = true,
 	}
 

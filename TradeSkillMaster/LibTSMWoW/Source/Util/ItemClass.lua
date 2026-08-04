@@ -162,6 +162,53 @@ ItemClass:OnModuleLoad(function()
 		end
 	end
 
+	-- Standard TSM class aliases (both English slash filters and Chinese translations)
+	local BUILTIN_CLASS_ALIASES = {
+		gem = Enum.ItemClass.Gem,
+		gems = Enum.ItemClass.Gem,
+		["珠宝"] = Enum.ItemClass.Gem,
+		armor = Enum.ItemClass.Armor,
+		["护甲"] = Enum.ItemClass.Armor,
+		weapon = Enum.ItemClass.Weapon,
+		weapons = Enum.ItemClass.Weapon,
+		["武器"] = Enum.ItemClass.Weapon,
+		container = Enum.ItemClass.Container,
+		containers = Enum.ItemClass.Container,
+		bag = Enum.ItemClass.Container,
+		bags = Enum.ItemClass.Container,
+		["容器"] = Enum.ItemClass.Container,
+		consumable = Enum.ItemClass.Consumable,
+		consumables = Enum.ItemClass.Consumable,
+		["消耗品"] = Enum.ItemClass.Consumable,
+		glyph = Enum.ItemClass.Glyph,
+		glyphs = Enum.ItemClass.Glyph,
+		["雕文"] = Enum.ItemClass.Glyph,
+		tradegoods = Enum.ItemClass.Tradegoods,
+		["商品"] = Enum.ItemClass.Tradegoods,
+		["交易商品"] = Enum.ItemClass.Tradegoods,
+		recipe = Enum.ItemClass.Recipe,
+		recipes = Enum.ItemClass.Recipe,
+		["配方"] = Enum.ItemClass.Recipe,
+		projectile = Enum.ItemClass.Projectile,
+		["弹药"] = Enum.ItemClass.Projectile,
+		quiver = Enum.ItemClass.Quiver,
+		["箭袋"] = Enum.ItemClass.Quiver,
+		reagent = Enum.ItemClass.Reagent,
+		reagents = Enum.ItemClass.Reagent,
+		["材料"] = Enum.ItemClass.Reagent,
+		misc = Enum.ItemClass.Miscellaneous,
+		miscellaneous = Enum.ItemClass.Miscellaneous,
+		["杂项"] = Enum.ItemClass.Miscellaneous,
+		quest = Enum.ItemClass.Questitem,
+		["任务"] = Enum.ItemClass.Questitem,
+		pet = Enum.ItemClass.Battlepet,
+		pets = Enum.ItemClass.Battlepet,
+		["宠物"] = Enum.ItemClass.Battlepet,
+	}
+	for alias, cId in pairs(BUILTIN_CLASS_ALIASES) do
+		private.classIdLookup[alias] = cId
+	end
+
 	for class, subClasses in pairs(private.classLookup) do
 		tinsert(private.classes, class)
 		private.subClasses[class] = {}
@@ -267,12 +314,23 @@ end
 ---@param classId number The class ID
 ---@return number
 function ItemClass.GetSubClassIdFromSubClassString(subClass, classId)
-	if not classId then return end
+	if not classId or not subClass then return end
+	local subLower = strlower(subClass)
 	local class = ItemClass.GetClassInfo(classId)
-	if not private.classLookup[class] then return end
-	for str, index in pairs(private.classLookup[class]) do
-		if strlower(str) == strlower(subClass) then
-			return index
+	if private.classLookup[class] then
+		for str, index in pairs(private.classLookup[class]) do
+			if strlower(str) == subLower then
+				return index
+			end
+		end
+	end
+	-- Fallback check against Enum.__ItemClassInfo (English / static subclass names)
+	local subClassInfo = Enum.__ItemClassInfo and Enum.__ItemClassInfo[classId]
+	if subClassInfo then
+		for index, str in pairs(subClassInfo) do
+			if type(str) == "string" and strlower(str) == subLower then
+				return index
+			end
 		end
 	end
 end

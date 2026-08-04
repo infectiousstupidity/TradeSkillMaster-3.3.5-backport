@@ -1426,3 +1426,67 @@ L["ilvl"] = "ilvl"
 -- LOCALE STRINGS END HERE
 
 TSM.Locale.SetTable(L)
+
+-- 3.3.5a Backport & Auction UI Additions
+L["Abort"] = "Abort"
+L["Back"] = "Back"
+L["Bid"] = "Bid"
+L["Cannot query auction right now (throttled)."] = "Cannot query auction right now (throttled)."
+L["Done! %d auctions, %d items in %.1fs (%s mode)"] = "Done! %d auctions, %d items in %.1fs (%s mode)"
+L["Fast Scan returned no data or timed out. Falling back to Slow Scan."] = "Fast Scan returned no data or timed out. Falling back to Slow Scan."
+L["Fast Scan returned no data. Falling back to Slow Scan."] = "Fast Scan returned no data. Falling back to Slow Scan."
+L["Fast Scan"] = "Fast Scan"
+L["Fast Scan: waiting for server (getAll)..."] = "Fast Scan: waiting for server (getAll)..."
+L["Full Auction House Scan"] = "Full Auction House Scan"
+L["Full scan complete: %d auctions, %d items saved to local AuctionDB (%.1fs)"] = "Full scan complete: %d auctions, %d items saved to local AuctionDB (%.1fs)"
+L["Idle"] = "Idle"
+L["No active scan to abort."] = "No active scan to abort."
+L["Open the Auction House first."] = "Open the Auction House first."
+L["Open the Auction House, then run Fast or Slow Scan."] = "Open the Auction House, then run Fast or Slow Scan."
+L["Page %d timed out after %ds - aborting."] = "Page %d timed out after %ds - aborting."
+L["Page %d/%d resolving %d links (pass %d/%d)..."] = "Page %d/%d resolving %d links (pass %d/%d)..."
+L["Page"] = "Page"
+L["Paged scan: page %d..."] = "Paged scan: page %d..."
+L["Previous scan still cleaning up, wait a moment."] = "Previous scan still cleaning up, wait a moment."
+L["Processing %d auctions..."] = "Processing %d auctions..."
+L["Processing"] = "Processing"
+L["Retry pass %d/%d (%d items)..."] = "Retry pass %d/%d (%d items)..."
+L["Scan aborted by user."] = "Scan aborted by user."
+L["Scan already in progress. Use Abort to stop it."] = "Scan already in progress. Use Abort to stop it."
+L["Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."] = "Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."
+L["Server throttle never cleared - aborting scan."] = "Server throttle never cleared - aborting scan."
+L["Skipped %d auctions after %d retries (item cache)."] = "Skipped %d auctions after %d retries (item cache)."
+L["Slow Scan"] = "Slow Scan"
+L["Addon Language (requires reload)"] = "Addon Language (requires reload)"
+L["Auto (game default)"] = "Auto (game default)"
+L["Customize the font and item icon sizes used throughout TSM."] = "Customize the font and item icon sizes used throughout TSM."
+L["Default"] = "Default"
+L["Extra Large (130%)"] = "Extra Large (130%)"
+L["Font Size"] = "Font Size"
+L["Font"] = "Font"
+L["Item Icon Size"] = "Item Icon Size"
+L["Large (115%)"] = "Large (115%)"
+L["Normal (100%)"] = "Normal (100%)"
+L["Overrides the language TSM uses for its interface. 'Auto' uses your game client's language. Changing this requires reloading your UI."] = "Overrides the language TSM uses for its interface. 'Auto' uses your game client's language. Changing this requires reloading your UI."
+L["Scales all TSM text sizes proportionally."] = "Scales all TSM text sizes proportionally."
+L["Scan ended without saving to AuctionDB."] = "Scan ended without saving to AuctionDB."
+L["Scan ended without saving."] = "Scan ended without saving."
+L["Skipped all %d items in the selected groups. Items must have a Shopping operation applied (with a valid max price) and be below their restock quantity to be included in a group search."] = "Skipped all %d items in the selected groups. Items must have a Shopping operation applied (with a valid max price) and be below their restock quantity to be included in a group search."
+L["Small (85%)"] = "Small (85%)"
+L["The font used throughout TSM. Default uses bundled fonts or your UI addon's font when available."] = "The font used throughout TSM. Default uses bundled fonts or your UI addon's font when available."
+L["The selected groups don't contain any items."] = "The selected groups don't contain any items."
+L["The size of item icons shown in TSM lists and tables."] = "The size of item icons shown in TSM lists and tables."
+L["Typography"] = "Typography"
+L["Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."] = "Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."

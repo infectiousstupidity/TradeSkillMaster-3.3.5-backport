@@ -1426,3 +1426,67 @@ L["ilvl"] = "物品等级"
 -- LOCALE STRINGS END HERE
 
 TSM.Locale.SetTable(L)
+
+-- 3.3.5a Backport & Auction UI Additions
+L["Abort"] = "中断"
+L["Back"] = "返回"
+L["Bid"] = "竞标"
+L["Cannot query auction right now (throttled)."] = "当前无法查询拍卖行（处于发包冷却中）。"
+L["Done! %d auctions, %d items in %.1fs (%s mode)"] = "完成！在 %.1f 秒内处理了 %d 个拍卖，%d 个物品（%s 模式）"
+L["Fast Scan returned no data or timed out. Falling back to Slow Scan."] = "快速扫描未返回数据或超时，正在切回慢速扫描。"
+L["Fast Scan returned no data. Falling back to Slow Scan."] = "快速扫描未返回数据，正在切回慢速扫描。"
+L["Fast Scan"] = "快速扫描"
+L["Fast Scan: waiting for server (getAll)..."] = "快速扫描：等待服务器响应 (getAll)..."
+L["Full Auction House Scan"] = "全量拍卖行扫描"
+L["Full scan complete: %d auctions, %d items saved to local AuctionDB (%.1fs)"] = "全量扫描完成：%d 个拍卖，%d 个物品已保存至本地 AuctionDB (耗时 %.1f 秒)"
+L["Idle"] = "空闲"
+L["No active scan to abort."] = "没有正在运行的扫描可供中断。"
+L["Open the Auction House first."] = "请先打开拍卖行。"
+L["Open the Auction House, then run Fast or Slow Scan."] = "请打开拍卖行，然后运行快速或慢速扫描。"
+L["Page %d timed out after %ds - aborting."] = "第 %d 页在 %d 秒内未响应 - 已中断。"
+L["Page %d/%d resolving %d links (pass %d/%d)..."] = "第 %d/%d 页：正在解析 %d 个物品链接 (第 %d/%d 轮)..."
+L["Page"] = "页"
+L["Paged scan: page %d..."] = "分页扫描：第 %d 页..."
+L["Previous scan still cleaning up, wait a moment."] = "上一次扫描正在清理中，请稍候。"
+L["Processing %d auctions..."] = "正在处理 %d 个拍卖..."
+L["Processing"] = "处理中"
+L["Retry pass %d/%d (%d items)..."] = "重试第 %d/%d 轮 (%d 个物品)..."
+L["Scan aborted by user."] = "扫描已被用户中断。"
+L["Scan already in progress. Use Abort to stop it."] = "扫描已经在进行中。使用[中断]按钮停止它。"
+L["Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."] = "扫描整个拍卖行并将其价格保存到本地 AuctionDB。
+
+|cffffd839%s|r  -  单次 getAll 请求，一次性读取所有数据，无冷却。
+|cffffd839%s|r  -  按页扫描，速度较慢但没有冷却。"
+L["Server throttle never cleared - aborting scan."] = "服务器限制未解除 - 扫描已中断。"
+L["Skipped %d auctions after %d retries (item cache)."] = "重试 %d 次后跳过了 %d 个拍卖 (物品缓存)。"
+L["Slow Scan"] = "慢速扫描"
+L["Addon Language (requires reload)"] = "插件语言（需要重新加载界面）"
+L["Auto (game default)"] = "自动（游戏默认）"
+L["Customize the font and item icon sizes used throughout TSM."] = "自定义整个 TSM 使用的字体和物品图标大小。"
+L["Default"] = "默认"
+L["Extra Large (130%)"] = "超大 (130%)"
+L["Font Size"] = "字体大小"
+L["Font"] = "字体"
+L["Item Icon Size"] = "物品图标大小"
+L["Large (115%)"] = "大 (115%)"
+L["Normal (100%)"] = "正常 (100%)"
+L["Overrides the language TSM uses for its interface. 'Auto' uses your game client's language. Changing this requires reloading your UI."] = "覆盖 TSM 界面语言。'自动' 将使用您游戏客户端的语言。更改此设置需要重新加载 UI。"
+L["Scales all TSM text sizes proportionally."] = "按比例缩放所有 TSM 文本大小。"
+L["Scan ended without saving to AuctionDB."] = "扫描结束，未保存到 AuctionDB。"
+L["Scan ended without saving."] = "扫描结束，未保存。"
+L["Skipped all %d items in the selected groups. Items must have a Shopping operation applied (with a valid max price) and be below their restock quantity to be included in a group search."] = "已跳过所选分组中的所有 %d 个物品。物品必须应用了购买操作（带有有效的最高价格）且低于补货数量才能包含在分组搜索中。"
+L["Small (85%)"] = "小 (85%)"
+L["The font used throughout TSM. Default uses bundled fonts or your UI addon's font when available."] = "整个 TSM 使用的字体。默认使用内置字体或全局界面插件字体。"
+L["The selected groups don't contain any items."] = "所选的分组不包含任何物品。"
+L["The size of item icons shown in TSM lists and tables."] = "TSM 列表和表格中显示的物品图标大小。"
+L["Typography"] = "字体排版"
+L["Scan the entire Auction House and save its prices to your local AuctionDB.
+
+|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
+|cffffd839%s|r  -  page by page, slower but no cooldown."] = "扫描整个拍卖行并将其价格保存到本地 AuctionDB。
+
+|cffffd839%s|r  -  单次 getAll 请求，一次性读取所有数据，无冷却。
+|cffffd839%s|r  -  按页扫描，速度较慢但没有冷却。"

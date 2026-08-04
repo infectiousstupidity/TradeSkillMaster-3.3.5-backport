@@ -281,13 +281,15 @@ end
 
 function private.OnFastScanClick()
 	if not private.PreflightChecks() then return end
-	local canQuery = CanSendAuctionQuery()
+	local canQuery, canQueryAll = CanSendAuctionQuery()
 	if not canQuery then
 		ChatMessage.PrintfUser(L["Cannot query auction right now (throttled)."])
 		return
 	end
-	-- No getAll cooldown gate: private servers ignore the 15-min client cooldown,
-	-- so we fire getAll regardless of canQueryAll.
+	if not canQueryAll then
+		ChatMessage.PrintfUser("|cffff0000[TSM 错误]|r 当前服务器限制/未开放 Fast Scan (GetAll 一键全量扫描)。已取消请求以防止切断连接掉线！")
+		return
+	end
 	private.StartGetAllScan()
 end
 
