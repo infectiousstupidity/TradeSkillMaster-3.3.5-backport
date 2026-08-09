@@ -287,8 +287,7 @@ function private.OnFastScanClick()
 		return
 	end
 	if not canQueryAll then
-		ChatMessage.PrintfUser("|cffff0000[TSM 错误]|r 当前服务器限制/未开放 Fast Scan (GetAll 一键全量扫描)。已取消请求以防止切断连接掉线！")
-		return
+		ChatMessage.PrintfUser("|cffffaa00[Fast Scan]|r 客户端冷却尚未解除，尝试向服务器发送 Fast Scan (getAll) 请求... 若无响应将自动转入慢速扫描。")
 	end
 	private.StartGetAllScan()
 end
@@ -329,10 +328,8 @@ function private.FallbackToPagedScan(reason)
 	end
 	private.UnregisterGetAll()
 	private.SafeUpdateUI(reason, 0.05)
-	C_Timer.After(0.2, function()
-		if private.scanState == "querying" and private.mode == "getAll" then
-			private.StartPagedScanImpl()
-		end
+	C_Timer.After(0.3, function()
+		private.StartPagedScanImpl()
 	end)
 end
 
@@ -363,7 +360,7 @@ function private.StartGetAllScan()
 	C_Timer.After(GETALL_TIMEOUT, function()
 		if private.scanState == "querying" and private.mode == "getAll" and private.timeoutToken == myToken then
 			ChatMessage.PrintfUser(L["Fast Scan returned no data or timed out. Falling back to Slow Scan."])
-			private.FallbackToPagedScan("Fast Scan timed out; switching to Slow Scan...")
+			private.FallbackToPagedScan("Fast Scan 超时未响应，正在自动平滑切入慢速分页扫描...")
 		end
 	end)
 end
@@ -372,10 +369,17 @@ function private.OnGetAllResult()
 	if private.scanState ~= "querying" or private.mode ~= "getAll" then return end
 	private.UnregisterGetAll()
 
-	local numBatch = GetNumAuctionItems("list")
-	if numBatch == 0 then
+	local numBatch, numTotal = GetNumAuctionItems("list")
+	if not numBatch or numBatch == 0 then
 		ChatMessage.PrintfUser(L["Fast Scan returned no data. Falling back to Slow Scan."])
-		private.FallbackToPagedScan("Fast Scan returned no data; switching to Slow Scan...")
+		private.FallbackToPagedScan("Fast Scan 返回空数据，正在自动平滑切入慢速分页扫描...")
+		return
+	end
+
+	-- If numBatch <= PAGE_SIZE (e.g. only 50 items returned), it was a partial page response rather than a full getAll response.
+	if numBatch <= PAGE_SIZE and (numTotal and numTotal > PAGE_SIZE) then
+		ChatMessage.PrintfUser(string.format("|cffffaa00[Fast Scan]|r 收到单页数据 (%d/%d)，正在自动平滑切入慢速分页扫描...", numBatch, numTotal))
+		private.FallbackToPagedScan("Fast Scan 返回单页，正在自动平滑切入慢速分页扫描...")
 		return
 	end
 
