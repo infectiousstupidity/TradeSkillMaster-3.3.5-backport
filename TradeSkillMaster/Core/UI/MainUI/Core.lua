@@ -9,6 +9,7 @@ local MainUI = TSM:NewPackage("MainUI") ---@type AddonPackage
 local UIElements = TSM.LibTSMUI:Include("Util.UIElements")
 local UIUtils = TSM.LibTSMUI:Include("Util.UIUtils")
 local AppHelper = TSM.LibTSMApp:Include("Service.AppHelper")
+local L = TSM.Locale.GetTable()
 local private = {
 	settings = nil,
 	topLevelPages = {},
@@ -74,7 +75,7 @@ function private.CreateMainFrame()
 		:AddDiscordIcon("https://discord.gg/sKpJbUrsvR")
 		:SetScript("OnHide", private.BaseFrameOnHide)
 	for _, info in ipairs(private.topLevelPages) do
-		frame:AddNavButton(info.name, info.callback)
+		frame:AddNavButton(L[info.name], info.callback)
 	end
 	local whatsNewDialog = TSM.UI.WhatsNew.GetDialog()
 	if whatsNewDialog then
