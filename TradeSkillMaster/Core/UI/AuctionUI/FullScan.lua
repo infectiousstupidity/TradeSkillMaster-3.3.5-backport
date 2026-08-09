@@ -57,7 +57,7 @@ local DUP_REQUERY_DELAY = 0.15 -- пауза перед повтором echo-с
 -- Транзиентный пустой батч в середине скана: не считаем концом АХ, повторяем страницу.
 local MAX_EMPTY_PAGE_RETRIES = 2 -- повторов пустой страницы до принудительного финиша
 local EMPTY_PAGE_RETRY_DELAY = 0.2 -- пауза перед повтором пустой страницы
-local SMART_PROBE_INTERVAL = 0.35 -- Probe interval on private servers (350ms instead of 1.0s client throttle)
+local SMART_PROBE_INTERVAL = 0.20 -- Probe interval on private servers (200ms instead of 1.0s client throttle)
 local DEBUG_LOG_EVERY_N_PAGES = 0 -- частота snapshot-сообщений в чат
 local DEBUG_LOG_RETRIES = false -- логировать каждый page retry в чат
 
