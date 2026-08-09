@@ -521,6 +521,7 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 			state.selectionCanPost = postContext:CanPost() or false
 		end
 		if success and state.auctionScrollTable then
+			state.auctionScrollTable:UpdateData()
 			state.auctionScrollTable:ExpandSingleResult()
 		end
 		if not success then

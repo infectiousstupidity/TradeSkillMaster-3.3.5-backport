@@ -572,7 +572,16 @@ end
 ---@return number? minPrice
 function AuctionRow:GetBuyouts(resultItemKey)
 	if not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
-		return nil, nil, nil
+		local minItemBuyout = nil
+		for _, subRow in ipairs(self._subRows) do
+			if subRow:HasRawData() then
+				local _, itemBuyout = subRow:GetBuyouts()
+				if itemBuyout and itemBuyout > 0 then
+					minItemBuyout = min(minItemBuyout or math.huge, itemBuyout)
+				end
+			end
+		end
+		return nil, nil, minItemBuyout
 	end
 	assert(#self._items > 0)
 	if resultItemKey then
