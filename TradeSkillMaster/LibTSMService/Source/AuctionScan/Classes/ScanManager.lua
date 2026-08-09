@@ -794,6 +794,12 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 				-- again (throttle cleared / list settled) before returning the index,
 				-- exactly like the Browse tab and default UI where the list has long
 				-- settled before the user clicks Buyout.
+				-- 3.3.5 sniper buyout fix (part 2+3): wait for CanSendQuery() (client
+				-- throttle, ~1-1.5s) then wait only the REMAINING gap to cover Warmane's
+				-- server-side PlaceAuctionBid throttle (~2s after any query). The old
+				-- code always added Sleep(2) ON TOP of the CanSendQuery wait → 3.5s total.
+				-- Now we account for time already spent waiting, capping at BID_THROTTLE.
+				local BID_THROTTLE = 2
 				local settleStart = GetTime and GetTime() or 0
 				while not AuctionHouse.CanSendQuery() do
 					Threading.Yield(true)
@@ -804,17 +810,12 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 						break
 					end
 				end
-				-- 3.3.5 sniper buyout fix (part 3): Warmane throttles PlaceAuctionBid for
-				-- a couple seconds after ANY auction query from the player. CanSendQuery()
-				-- (the client query throttle) clears FASTER than this server-side bid
-				-- throttle, which is why canSendQuery=true above yet the bid is still
-				-- silently dropped (no event, no gold change, 5s client timeout). The
-				-- sniper is always querying (or just requeried right here), so the bid
-				-- always lands inside that window. Browse / default UI work only because
-				-- of the human gap (select -> click Buy -> confirm) with no query in
-				-- between. The scan is paused during this find (no queries fire while we
-				-- sleep), so wait out the server bid-throttle before returning the index.
-				Threading.Sleep(2)
+				-- CanSendQuery() already burned part of the bid-throttle window.
+				-- Only sleep whatever is left (often 0.5s or less, not a full 2s).
+				local remaining = BID_THROTTLE - AuctionHouse.GetTimeSinceLastQuery()
+				if remaining > 0 then
+					Threading.Sleep(remaining)
+				end
 				return self._findResult
 			elseif self._cancelled then
 				return nil
