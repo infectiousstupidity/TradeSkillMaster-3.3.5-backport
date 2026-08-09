@@ -198,22 +198,212 @@ local ItemProfessionSubclassLocale = {
 	[Enum.ItemProfessionSubclass.Archaeology] = "Archaeology",
 }
 
+local ItemConsumableSubclassLocale_zhCN = {
+	[Enum.ItemConsumableSubclass.Generic] = "爆炸物和装置",
+	[Enum.ItemConsumableSubclass.Potion] = "药水",
+	[Enum.ItemConsumableSubclass.Elixir] = "药剂",
+	[Enum.ItemConsumableSubclass.Scroll] = "卷轴",
+	[Enum.ItemConsumableSubclass.Fooddrink] = "食物和饮料",
+	[Enum.ItemConsumableSubclass.Itemenhancement] = "物品强化",
+	[Enum.ItemConsumableSubclass.Bandage] = "绷带",
+	[Enum.ItemConsumableSubclass.Other] = "其他",
+}
+
+local ItemContainerSubclassLocale_zhCN = {
+	"容器",
+	"灵魂袋",
+	"草药袋",
+	"附魔材料袋",
+	"工程学材料袋",
+	"宝石袋",
+	"矿石袋",
+	"制皮材料袋",
+	"铭文材料袋",
+	"钓鱼宝箱",
+	"烹饪袋",
+}
+
+local ItemProjectileSubclassLocale_zhCN = {
+	"魔杖",
+	"箭",
+	"子弹",
+	"投掷武器",
+}
+
+local ItemTradegoodsSubclassLocale_zhCN = {
+	"商品",
+	"零件",
+	"炸药",
+	"装置",
+	"珠宝加工",
+	"布料",
+	"皮革",
+	"金属与石头",
+	"烹饪",
+	"草药",
+	"元素",
+	"其他",
+	"附魔",
+	"材料",
+	"护甲附魔",
+	"武器附魔",
+	"铭文",
+}
+
+local ItemQuiverSubclassLocale_zhCN = {
+	"箭袋",
+	"箭袋",
+	"弹药包",
+}
+
+local ItemQuestitemSubclassLocale_zhCN = {
+	"任务",
+}
+
+local ItemGlyphSubclassLocale_zhCN = {
+	"战士",
+	"圣骑士",
+	"猎人",
+	"潜行者",
+	"牧师",
+	"死亡骑士",
+	"萨满祭司",
+	"法师",
+	"术士",
+	"武僧",
+	"德鲁伊",
+	"恶魔猎手",
+}
+
+local ItemWeaponSubclassLocale_zhCN = {
+	[Enum.ItemWeaponSubclass.Axe1H] = "单手斧",
+	[Enum.ItemWeaponSubclass.Axe2H] = "双手斧",
+	[Enum.ItemWeaponSubclass.Bows] = "弓",
+	[Enum.ItemWeaponSubclass.Guns] = "枪械",
+	[Enum.ItemWeaponSubclass.Mace1H] = "单手锤",
+	[Enum.ItemWeaponSubclass.Mace2H] = "双手锤",
+	[Enum.ItemWeaponSubclass.Polearm] = "长柄武器",
+	[Enum.ItemWeaponSubclass.Sword1H] = "单手剑",
+	[Enum.ItemWeaponSubclass.Sword2H] = "双手剑",
+	[Enum.ItemWeaponSubclass.Warglaive] = "战刃",
+	[Enum.ItemWeaponSubclass.Staff] = "法杖",
+	[Enum.ItemWeaponSubclass.Bearclaw] = "熊爪",
+	[Enum.ItemWeaponSubclass.Catclaw] = "猫爪",
+	[Enum.ItemWeaponSubclass.Unarmed] = "拳套",
+	[Enum.ItemWeaponSubclass.Generic] = "杂项",
+	[Enum.ItemWeaponSubclass.Dagger] = "匕首",
+	[Enum.ItemWeaponSubclass.Thrown] = "投掷武器",
+	[Enum.ItemWeaponSubclass.Crossbow] = "弩",
+	[Enum.ItemWeaponSubclass.Wand] = "魔杖",
+	[Enum.ItemWeaponSubclass.Fishingpole] = "钓鱼竿",
+}
+
+local ItemGemSubclassLocale_zhCN = {
+	[Enum.ItemGemSubclass.Red] = "红色",
+	[Enum.ItemGemSubclass.Blue] = "蓝色",
+	[Enum.ItemGemSubclass.Yellow] = "黄色",
+	[Enum.ItemGemSubclass.Purple] = "紫色",
+	[Enum.ItemGemSubclass.Green] = "绿色",
+	[Enum.ItemGemSubclass.Orange] = "橙色",
+	[Enum.ItemGemSubclass.Meta] = "多彩",
+	[Enum.ItemGemSubclass.Simple] = "简单",
+	[Enum.ItemGemSubclass.Prismatic] = "棱彩",
+}
+
+local ItemArmorSubclassLocale_zhCN = {
+	[Enum.ItemArmorSubclass.Generic] = "杂项",
+	[Enum.ItemArmorSubclass.Cloth] = "布甲",
+	[Enum.ItemArmorSubclass.Leather] = "皮甲",
+	[Enum.ItemArmorSubclass.Mail] = "锁甲",
+	[Enum.ItemArmorSubclass.Plate] = "板甲",
+	[Enum.ItemArmorSubclass.Cosmetic] = "装饰品",
+	[Enum.ItemArmorSubclass.Shield] = "盾牌",
+	[Enum.ItemArmorSubclass.Libram] = "圣契",
+	[Enum.ItemArmorSubclass.Idol] = "神像",
+	[Enum.ItemArmorSubclass.Totem] = "图腾",
+	[Enum.ItemArmorSubclass.Sigil] = "魔印",
+	[Enum.ItemArmorSubclass.Relic] = "圣物",
+}
+
+local ItemReagentSubclassLocale_zhCN = {
+	[Enum.ItemReagentSubclass.Reagent] = "材料",
+	[Enum.ItemReagentSubclass.Keystone] = "钥石",
+	[Enum.ItemReagentSubclass.ContextToken] = "兑换物",
+}
+
+local ItemRecipeSubclassLocale_zhCN = {
+	[Enum.ItemRecipeSubclass.Book] = "书籍",
+	[Enum.ItemRecipeSubclass.Leatherworking] = "制皮",
+	[Enum.ItemRecipeSubclass.Tailoring] = "裁缝",
+	[Enum.ItemRecipeSubclass.Engineering] = "工程学",
+	[Enum.ItemRecipeSubclass.Blacksmithing] = "锻造",
+	[Enum.ItemRecipeSubclass.Cooking] = "烹饪",
+	[Enum.ItemRecipeSubclass.Alchemy] = "炼金术",
+	[Enum.ItemRecipeSubclass.FirstAid] = "急救",
+	[Enum.ItemRecipeSubclass.Enchanting] = "附魔",
+	[Enum.ItemRecipeSubclass.Fishing] = "钓鱼",
+	[Enum.ItemRecipeSubclass.Jewelcrafting] = "珠宝加工",
+	[Enum.ItemRecipeSubclass.Inscription] = "铭文",
+}
+
+local ItemMiscellaneousSubclassLocale_zhCN = {
+	[Enum.ItemMiscellaneousSubclass.Junk] = "垃圾",
+	[Enum.ItemMiscellaneousSubclass.Reagent] = "材料",
+	[Enum.ItemMiscellaneousSubclass.CompanionPet] = "宠物",
+	[Enum.ItemMiscellaneousSubclass.Holiday] = "节日",
+	[Enum.ItemMiscellaneousSubclass.Other] = "其他",
+	[Enum.ItemMiscellaneousSubclass.Mount] = "坐骑",
+	[Enum.ItemMiscellaneousSubclass.MountEquipment] = "坐骑装备",
+}
+
+local BattlePetTypesLocale_zhCN = {
+	[Enum.BattlePetTypes.Humanoid] = "人型",
+	[Enum.BattlePetTypes.Dragonkin] = "龙类",
+	[Enum.BattlePetTypes.Flying] = "飞行",
+	[Enum.BattlePetTypes.Undead] = "亡灵",
+	[Enum.BattlePetTypes.Critter] = "小动物",
+	[Enum.BattlePetTypes.Magic] = "魔法",
+	[Enum.BattlePetTypes.Elemental] = "元素",
+	[Enum.BattlePetTypes.Beast] = "野兽",
+	[Enum.BattlePetTypes.Aquatic] = "水栖",
+	[Enum.BattlePetTypes.Mechanical] = "机械",
+}
+
+local ItemProfessionSubclassLocale_zhCN = {
+	[Enum.ItemProfessionSubclass.Blacksmithing] = "锻造",
+	[Enum.ItemProfessionSubclass.Leatherworking] = "制皮",
+	[Enum.ItemProfessionSubclass.Alchemy] = "炼金术",
+	[Enum.ItemProfessionSubclass.Herbalism] = "草药学",
+	[Enum.ItemProfessionSubclass.Cooking] = "烹饪",
+	[Enum.ItemProfessionSubclass.Mining] = "采矿",
+	[Enum.ItemProfessionSubclass.Tailoring] = "裁缝",
+	[Enum.ItemProfessionSubclass.Engineering] = "工程学",
+	[Enum.ItemProfessionSubclass.Enchanting] = "附魔",
+	[Enum.ItemProfessionSubclass.Fishing] = "钓鱼",
+	[Enum.ItemProfessionSubclass.Skinning] = "剥皮",
+	[Enum.ItemProfessionSubclass.Jewelcrafting] = "珠宝加工",
+	[Enum.ItemProfessionSubclass.Inscription] = "铭文",
+	[Enum.ItemProfessionSubclass.Archaeology] = "考古学",
+}
+
+local isZh = GetLocale and (GetLocale() == "zhCN" or GetLocale() == "zhTW")
+
 Enum.__ItemClassInfo = {
-	[Enum.ItemClass.Consumable] = ItemConsumableSubclassLocale,
-	[Enum.ItemClass.Container] = ItemContainerSubclassLocale,
-	[Enum.ItemClass.Weapon] = ItemWeaponSubclassLocale,
-	[Enum.ItemClass.Gem] = ItemGemSubclassLocale,
-	[Enum.ItemClass.Armor] = ItemArmorSubclassLocale,
-	[Enum.ItemClass.Reagent] = ItemReagentSubclassLocale,
-	[Enum.ItemClass.Projectile] = ItemProjectileSubclassLocale,
-	[Enum.ItemClass.Tradegoods] = ItemTradegoodsSubclassLocale,
-	[Enum.ItemClass.Recipe] = ItemRecipeSubclassLocale,
-	[Enum.ItemClass.Quiver] = ItemQuiverSubclassLocale,
-	[Enum.ItemClass.Questitem] = ItemQuestitemSubclassLocale,
-	[Enum.ItemClass.Miscellaneous] = ItemMiscellaneousSubclassLocale,
-	[Enum.ItemClass.Glyph] = ItemGlyphSubclassLocale,
-	[Enum.ItemClass.Battlepet] = BattlePetTypesLocale,
-	[Enum.ItemClass.Profession] = ItemProfessionSubclassLocale,
+	[Enum.ItemClass.Consumable] = isZh and ItemConsumableSubclassLocale_zhCN or ItemConsumableSubclassLocale,
+	[Enum.ItemClass.Container] = isZh and ItemContainerSubclassLocale_zhCN or ItemContainerSubclassLocale,
+	[Enum.ItemClass.Weapon] = isZh and ItemWeaponSubclassLocale_zhCN or ItemWeaponSubclassLocale,
+	[Enum.ItemClass.Gem] = isZh and ItemGemSubclassLocale_zhCN or ItemGemSubclassLocale,
+	[Enum.ItemClass.Armor] = isZh and ItemArmorSubclassLocale_zhCN or ItemArmorSubclassLocale,
+	[Enum.ItemClass.Reagent] = isZh and ItemReagentSubclassLocale_zhCN or ItemReagentSubclassLocale,
+	[Enum.ItemClass.Projectile] = isZh and ItemProjectileSubclassLocale_zhCN or ItemProjectileSubclassLocale,
+	[Enum.ItemClass.Tradegoods] = isZh and ItemTradegoodsSubclassLocale_zhCN or ItemTradegoodsSubclassLocale,
+	[Enum.ItemClass.Recipe] = isZh and ItemRecipeSubclassLocale_zhCN or ItemRecipeSubclassLocale,
+	[Enum.ItemClass.Quiver] = isZh and ItemQuiverSubclassLocale_zhCN or ItemQuiverSubclassLocale,
+	[Enum.ItemClass.Questitem] = isZh and ItemQuestitemSubclassLocale_zhCN or ItemQuestitemSubclassLocale,
+	[Enum.ItemClass.Miscellaneous] = isZh and ItemMiscellaneousSubclassLocale_zhCN or ItemMiscellaneousSubclassLocale,
+	[Enum.ItemClass.Glyph] = isZh and ItemGlyphSubclassLocale_zhCN or ItemGlyphSubclassLocale,
+	[Enum.ItemClass.Battlepet] = isZh and BattlePetTypesLocale_zhCN or BattlePetTypesLocale,
+	[Enum.ItemClass.Profession] = isZh and ItemProfessionSubclassLocale_zhCN or ItemProfessionSubclassLocale,
 }
 
 Enum.__InventoryTypeInfo = {

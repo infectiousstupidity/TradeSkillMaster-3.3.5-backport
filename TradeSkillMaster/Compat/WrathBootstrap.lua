@@ -359,29 +359,74 @@ end
 -- ============================================================================
 
 if not _G.C_Item then _G.C_Item = {} end
-if not _G.C_Item.GetItemClassInfo then
-	if type(_G.GetItemClassInfo) == "function" then
-		_G.C_Item.GetItemClassInfo = _G.GetItemClassInfo
-	else
-		local CLASS_NAMES = {
-			[0]  = "Consumable",
-			[1]  = "Container",
-			[2]  = "Weapon",
-			[3]  = "Gem",
-			[4]  = "Armor",
-			[5]  = "Reagent",
-			[6]  = "Projectile",
-			[7]  = "Trade Goods",
-			[8]  = "Recipe",
-			[9]  = "Quest",
-			[11] = "Quiver",
-			[12] = "Quest",
-			[13] = "Key",
-			[15] = "Miscellaneous",
-			[16] = "Glyph",
-		}
-		_G.C_Item.GetItemClassInfo = function(classID) return CLASS_NAMES[classID] end
+do
+	local MODERN_TO_AH_CLASS_INDEX = {
+		[0]  = 4,  -- Consumable (消耗品)
+		[1]  = 3,  -- Container (容器)
+		[2]  = 1,  -- Weapon (武器)
+		[3]  = 10, -- Gem (珠宝)
+		[4]  = 2,  -- Armor (护甲)
+		[6]  = 7,  -- Projectile (弹药)
+		[7]  = 6,  -- Trade Goods (商品)
+		[9]  = 9,  -- Recipe (配方)
+		[11] = 8,  -- Quiver (箭袋)
+		[12] = 12, -- Quest (任务)
+		[15] = 11, -- Miscellaneous (杂项)
+		[16] = 5,  -- Glyph (雕文)
+	}
+
+	local CLASS_NAMES_ZH = {
+		[0]  = "消耗品",
+		[1]  = "容器",
+		[2]  = "武器",
+		[3]  = "珠宝",
+		[4]  = "护甲",
+		[5]  = "材料",
+		[6]  = "弹药",
+		[7]  = "商品",
+		[8]  = "物品强化",
+		[9]  = "配方",
+		[11] = "箭袋",
+		[12] = "任务",
+		[13] = "钥匙",
+		[15] = "杂项",
+		[16] = "雕文",
+	}
+
+	local CLASS_NAMES_EN = {
+		[0]  = "Consumable",
+		[1]  = "Container",
+		[2]  = "Weapon",
+		[3]  = "Gem",
+		[4]  = "Armor",
+		[5]  = "Reagent",
+		[6]  = "Projectile",
+		[7]  = "Trade Goods",
+		[8]  = "Item Enhancement",
+		[9]  = "Recipe",
+		[11] = "Quiver",
+		[12] = "Quest",
+		[13] = "Key",
+		[15] = "Miscellaneous",
+		[16] = "Glyph",
+	}
+
+	_G.C_Item.GetItemClassInfo = function(classID)
+		if type(_G.GetAuctionItemClasses) == "function" then
+			local ahIdx = MODERN_TO_AH_CLASS_INDEX[classID]
+			if ahIdx then
+				local name = select(ahIdx, _G.GetAuctionItemClasses())
+				if name and name ~= "" then
+					return name
+				end
+			end
+		end
+		if _G.GetLocale and (_G.GetLocale() == "zhCN" or _G.GetLocale() == "zhTW") then
+			return CLASS_NAMES_ZH[classID] or CLASS_NAMES_EN[classID]
+		end
+		return CLASS_NAMES_EN[classID]
 	end
+	_G.GetItemClassInfo = _G.C_Item.GetItemClassInfo
 end
 
 -- ============================================================================
