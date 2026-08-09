@@ -293,7 +293,7 @@ function private.ItemLinkedCallback(name, itemLink)
 	local path = private.frame:GetSelectedNavButton()
 	for _, info in ipairs(private.topLevelPages) do
 		if info.name == path then
-			if info.itemLinkedHandler(name, itemLink) then
+			if info.itemLinkedHandler and info.itemLinkedHandler(name, itemLink) then
 				return true
 			else
 				return

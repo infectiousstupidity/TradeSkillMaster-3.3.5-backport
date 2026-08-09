@@ -411,7 +411,10 @@ function ApplicationFrame:HideDialog()
 	if not dialogFrame then
 		return
 	end
-	dialogFrame:GetParentElement():RemoveChild(dialogFrame)
+	local parent = dialogFrame:GetParentElement()
+	if parent then
+		parent:RemoveChild(dialogFrame)
+	end
 end
 
 function ApplicationFrame:Draw()
