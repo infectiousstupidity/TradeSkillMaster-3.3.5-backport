@@ -1453,13 +1453,7 @@ L["Processing"] = "Processing"
 L["Retry pass %d/%d (%d items)..."] = "Retry pass %d/%d (%d items)..."
 L["Scan aborted by user."] = "Scan aborted by user."
 L["Scan already in progress. Use Abort to stop it."] = "Scan already in progress. Use Abort to stop it."
-L["Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."] = "Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."
+L["Scan the entire Auction House and save its prices to your local AuctionDB.\n\n|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.\n|cffffd839%s|r  -  page by page, slower but no cooldown."] = "Scan the entire Auction House and save its prices to your local AuctionDB.\n\n|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.\n|cffffd839%s|r  -  page by page, slower but no cooldown."
 L["Server throttle never cleared - aborting scan."] = "Server throttle never cleared - aborting scan."
 L["Skipped %d auctions after %d retries (item cache)."] = "Skipped %d auctions after %d retries (item cache)."
 L["Slow Scan"] = "Slow Scan"
@@ -1483,10 +1477,3 @@ L["The font used throughout TSM. Default uses bundled fonts or your UI addon's f
 L["The selected groups don't contain any items."] = "The selected groups don't contain any items."
 L["The size of item icons shown in TSM lists and tables."] = "The size of item icons shown in TSM lists and tables."
 L["Typography"] = "Typography"
-L["Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."] = "Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."

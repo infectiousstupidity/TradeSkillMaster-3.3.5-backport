@@ -1453,13 +1453,7 @@ L["Processing"] = "處理中"
 L["Retry pass %d/%d (%d items)..."] = "重試第 %d/%d 輪 (%d 個物品)..."
 L["Scan aborted by user."] = "掃描已被使用者中斷。"
 L["Scan already in progress. Use Abort to stop it."] = "掃描已經在進行中。使用[中斷]按鈕停止它。"
-L["Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."] = "掃描整個拍賣行並將其價格儲存到本地 AuctionDB。
-
-|cffffd839%s|r  -  單次 getAll 請求，一次性讀取所有數據，無冷卻。
-|cffffd839%s|r  -  按頁掃描，速度較慢但沒有冷卻。"
+L["Scan the entire Auction House and save its prices to your local AuctionDB.\n\n|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.\n|cffffd839%s|r  -  page by page, slower but no cooldown."] = "掃描整個拍賣行並將其價格儲存到本地 AuctionDB。\n\n|cffffd839%s|r  -  單次 getAll 請求，一次性讀取所有數據，無冷卻。\n|cffffd839%s|r  -  按頁掃描，速度較慢但沒有冷卻。"
 L["Server throttle never cleared - aborting scan."] = "伺服器限制未解除 - 掃描已中斷。"
 L["Skipped %d auctions after %d retries (item cache)."] = "重試 %d 次後跳過了 %d 個拍賣 (物品快取)。"
 L["Slow Scan"] = "慢速掃描"
@@ -1483,10 +1477,3 @@ L["The font used throughout TSM. Default uses bundled fonts or your UI addon's f
 L["The selected groups don't contain any items."] = "所選的分組不包含任何物品。"
 L["The size of item icons shown in TSM lists and tables."] = "TSM 列表和表格中顯示的物品圖示大小。"
 L["Typography"] = "字體排版"
-L["Scan the entire Auction House and save its prices to your local AuctionDB.
-
-|cffffd839%s|r  -  single getAll request, reads everything at once, no cooldown.
-|cffffd839%s|r  -  page by page, slower but no cooldown."] = "掃描整個拍賣行並將其價格儲存到本地 AuctionDB。
-
-|cffffd839%s|r  -  單次 getAll 請求，一次性讀取所有數據，無冷卻。
-|cffffd839%s|r  -  按頁掃描，速度較慢但沒有冷卻。"
