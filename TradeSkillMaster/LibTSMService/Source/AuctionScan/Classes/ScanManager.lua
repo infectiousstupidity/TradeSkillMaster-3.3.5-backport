@@ -688,7 +688,7 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 			-- the index, exactly like the per-item-query fallback below already does.
 			-- A settled / completed scan (no recent query) clears both checks instantly,
 			-- so the common case keeps returning with no added delay.
-			local BID_THROTTLE = 0.5
+			local BID_THROTTLE = 2
 			if not AuctionHouse.CanSendQuery() or AuctionHouse.GetTimeSinceLastQuery() < BID_THROTTLE then
 				local settleStart = GetTime and GetTime() or 0
 				while not AuctionHouse.CanSendQuery() do
@@ -814,7 +814,7 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 				-- of the human gap (select -> click Buy -> confirm) with no query in
 				-- between. The scan is paused during this find (no queries fire while we
 				-- sleep), so wait out the server bid-throttle before returning the index.
-				Threading.Sleep(0.5)
+				Threading.Sleep(2)
 				return self._findResult
 			elseif self._cancelled then
 				return nil

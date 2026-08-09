@@ -1172,18 +1172,10 @@ function private.UnusedEventHandler(eventName, ...)
 end
 
 function private.CheckAllIdle()
-	local now = GetTime()
 	for apiName, wrapper in pairs(private.wrappers) do
 		if not wrapper:IsIdle() then
-			-- 3.3.5: Auto-release any wrapper stuck in PENDING state for over 1.5s
-			-- to prevent Post/Query buttons from becoming unclickable ("点不动").
-			if wrapper._callTime and (now - wrapper._callTime) > 1.5 then
-				Log.Warn("Auto-releasing stuck wrapper (%s, callTime %.2fs ago)", apiName, now - wrapper._callTime)
-				wrapper:CancelIfPending()
-			else
-				Log.Err("Another wrapper is pending (%s)", apiName)
-				return false
-			end
+			Log.Err("Another wrapper is pending (%s)", apiName)
+			return false
 		end
 	end
 	return true
