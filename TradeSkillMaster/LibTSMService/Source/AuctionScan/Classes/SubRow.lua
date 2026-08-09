@@ -61,6 +61,7 @@ function AuctionSubRow:__init()
 	self._texture = nil
 	self._sniperKept = false
 	self._sniperMaxPrice = nil
+	self._rawIndex = nil
 end
 
 function AuctionSubRow:_Acquire(resultRow)
@@ -287,6 +288,13 @@ end
 ---@return number numOwnerItems
 function AuctionSubRow:GetOwnerInfo()
 	assert(self:HasRawData())
+	if (self._ownerStr == "?" or not self._ownerStr) and self._rawIndex and (LibTSMService.IsVanillaClassic() or LibTSMService.IsBCClassic() or LibTSMService.IsWrathClassic()) then
+		local rawName, _, stackSize, _, _, _, _, _, buyout, _, _, liveSeller = GetAuctionItemInfo("list", self._rawIndex)
+		if rawName and liveSeller and liveSeller ~= "" and buyout == self._buyout and stackSize == self._quantity then
+			self._ownerStr = liveSeller
+			self._hasOwners = true
+		end
+	end
 	return self._ownerStr, self._numOwnerItems
 end
 
@@ -465,6 +473,7 @@ function AuctionSubRow:_SetRawData(data, browseId, itemLink)
 			self._hasOwners = seller and true or false
 			self._numOwnerItems = 0
 			self._auctionId = 0
+			self._rawIndex = data
 		else
 			if self._resultRow:IsCommodity() then
 				local baseItemString = self._resultRow:GetBaseItemString()
@@ -529,5 +538,6 @@ function AuctionSubRow:_SetRawData(data, browseId, itemLink)
 		self._hasOwners = false
 		self._numOwnerItems = nil
 		self._auctionId = nil
+		self._rawIndex = nil
 	end
 end

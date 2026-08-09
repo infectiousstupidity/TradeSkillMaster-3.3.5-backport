@@ -40,6 +40,7 @@ local private = {
 	doneTimer = nil,
 	updateTimer = nil,
 	missingItemIds = {},
+	sellerWaitCounts = {},
 	-- 3.3.5 diagnostics: per-scan counters for the classic browse processing
 	-- pipeline (printed for traced queries, e.g. DE scan)
 	classicStats = { seen = 0, noInfo = 0, noLink = 0, badLink = 0, nameSkip = 0, earlyReject = 0, added = 0 },
@@ -703,6 +704,7 @@ function private.CheckBrowseResults()
 			-- new scan starting: reset the diagnostics counters
 			local cs = private.classicStats
 			cs.seen, cs.noInfo, cs.noLink, cs.badLink, cs.nameSkip, cs.earlyReject, cs.added = 0, 0, 0, 0, 0, 0, 0
+			wipe(private.sellerWaitCounts)
 		end
 		-- Some 3.3.5a cores briefly return an empty page right after a browse query.
 		-- Retry a few times instead of immediately showing an empty result set.
@@ -833,6 +835,10 @@ function private.ProcessBrowseResultClassic(index)
 		return true
 	end
 	if not seller and private.resolveSellers then
+		if (private.sellerWaitCounts[index] or 0) < 2 then
+			private.sellerWaitCounts[index] = (private.sellerWaitCounts[index] or 0) + 1
+			return false
+		end
 		seller = "?"
 	end
 	private.query:_ProcessBrowseResult(baseItemString, itemLink)
