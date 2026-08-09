@@ -41,23 +41,22 @@ local private = {
 }
 
 local MAX_RETRY_PASSES = 3
-local RETRY_DELAY = 1.5 -- seconds between retry passes (getAll mode)
+local RETRY_DELAY = 3 -- seconds between retry passes (getAll mode)
 -- Paged mode: пропущенные линки добираем ЛОКАЛЬНО (повторный GetAuctionItemLink по тем же
 -- индексам), БЕЗ повторного QueryAuctionItems. Данные страницы остаются в буфере "list" до
 -- следующего query, а item-info ответы доходят за пару сотен мс. Это убирает целый server
 -- round-trip с каждой "грязной" страницы (старый путь re-query'ил страницу = +1 round-trip).
-local MAX_LINK_RESOLVE_PASSES = 1 -- локальных проходов по missing-линкам на страницу
-local LINK_RESOLVE_DELAY = 0.05 -- пауза (50ms), чтобы in-flight item-info ответы успели дойти
-local MIN_MISSING_FOR_RETRY = 25 -- добор включаем только если потеряли ≥50% страницы
+local MAX_LINK_RESOLVE_PASSES = 2 -- локальных проходов по missing-линкам на страницу
+local LINK_RESOLVE_DELAY = 0.25 -- пауза, чтобы in-flight item-info ответы успели дойти
+local MIN_MISSING_FOR_RETRY = 15 -- добор включаем только если потеряли ≥30% страницы
 -- Real echo (DUP): сервер вернул буфер предыдущей страницы. Обрабатывать его нельзя —
 -- предыдущая страница посчитается дважды, а реальная будет пропущена. Повторяем запрос
 -- той же страницы (с лимитом, чтобы не зациклиться на постоянно echo-ящем сервере).
 local MAX_DUP_REQUERIES = 3 -- повторов той же страницы при real echo
-local DUP_REQUERY_DELAY = 0.15 -- пауза перед повтором echo-страницы
+local DUP_REQUERY_DELAY = 0.5 -- пауза перед повтором echo-страницы
 -- Транзиентный пустой батч в середине скана: не считаем концом АХ, повторяем страницу.
 local MAX_EMPTY_PAGE_RETRIES = 2 -- повторов пустой страницы до принудительного финиша
-local EMPTY_PAGE_RETRY_DELAY = 0.2 -- пауза перед повтором пустой страницы
-local SMART_PROBE_INTERVAL = 0.20 -- Probe interval on private servers (200ms instead of 1.0s client throttle)
+local EMPTY_PAGE_RETRY_DELAY = 1 -- пауза перед повтором пустой страницы
 local DEBUG_LOG_EVERY_N_PAGES = 0 -- частота snapshot-сообщений в чат
 local DEBUG_LOG_RETRIES = false -- логировать каждый page retry в чат
 
@@ -143,9 +142,7 @@ private.throttlePollFrame:SetScript("OnUpdate", function(self, elapsed)
 		end
 		return
 	end
-	local canQuery = CanSendAuctionQuery()
-	local timeSinceLast = GetTime() - (private.pageQuerySent or 0)
-	if canQuery or timeSinceLast >= SMART_PROBE_INTERVAL then
+	if CanSendAuctionQuery() then
 		self:Hide()
 		self._elapsed = nil
 		if private.scanState == "paged" then
@@ -284,14 +281,13 @@ end
 
 function private.OnFastScanClick()
 	if not private.PreflightChecks() then return end
-	local canQuery, canQueryAll = CanSendAuctionQuery()
+	local canQuery = CanSendAuctionQuery()
 	if not canQuery then
 		ChatMessage.PrintfUser(L["Cannot query auction right now (throttled)."])
 		return
 	end
-	if not canQueryAll then
-		ChatMessage.PrintfUser("|cffffaa00[Fast Scan]|r 客户端冷却尚未解除，尝试向服务器发送 Fast Scan (getAll) 请求... 若无响应将自动转入慢速扫描。")
-	end
+	-- No getAll cooldown gate: private servers ignore the 15-min client cooldown,
+	-- so we fire getAll regardless of canQueryAll.
 	private.StartGetAllScan()
 end
 
@@ -331,8 +327,10 @@ function private.FallbackToPagedScan(reason)
 	end
 	private.UnregisterGetAll()
 	private.SafeUpdateUI(reason, 0.05)
-	C_Timer.After(0.3, function()
-		private.StartPagedScanImpl()
+	C_Timer.After(0.2, function()
+		if private.scanState == "querying" and private.mode == "getAll" then
+			private.StartPagedScanImpl()
+		end
 	end)
 end
 
@@ -363,7 +361,7 @@ function private.StartGetAllScan()
 	C_Timer.After(GETALL_TIMEOUT, function()
 		if private.scanState == "querying" and private.mode == "getAll" and private.timeoutToken == myToken then
 			ChatMessage.PrintfUser(L["Fast Scan returned no data or timed out. Falling back to Slow Scan."])
-			private.FallbackToPagedScan("Fast Scan 超时未响应，正在自动平滑切入慢速分页扫描...")
+			private.FallbackToPagedScan("Fast Scan timed out; switching to Slow Scan...")
 		end
 	end)
 end
@@ -372,17 +370,10 @@ function private.OnGetAllResult()
 	if private.scanState ~= "querying" or private.mode ~= "getAll" then return end
 	private.UnregisterGetAll()
 
-	local numBatch, numTotal = GetNumAuctionItems("list")
-	if not numBatch or numBatch == 0 then
+	local numBatch = GetNumAuctionItems("list")
+	if numBatch == 0 then
 		ChatMessage.PrintfUser(L["Fast Scan returned no data. Falling back to Slow Scan."])
-		private.FallbackToPagedScan("Fast Scan 返回空数据，正在自动平滑切入慢速分页扫描...")
-		return
-	end
-
-	-- If numBatch <= PAGE_SIZE (e.g. only 50 items returned), it was a partial page response rather than a full getAll response.
-	if numBatch <= PAGE_SIZE and (numTotal and numTotal > PAGE_SIZE) then
-		ChatMessage.PrintfUser(string.format("|cffffaa00[Fast Scan]|r 收到单页数据 (%d/%d)，正在自动平滑切入慢速分页扫描...", numBatch, numTotal))
-		private.FallbackToPagedScan("Fast Scan 返回单页，正在自动平滑切入慢速分页扫描...")
+		private.FallbackToPagedScan("Fast Scan returned no data; switching to Slow Scan...")
 		return
 	end
 
@@ -547,8 +538,9 @@ function private.QueryNextPage()
 	end
 
 	local canQuery = CanSendAuctionQuery()
-	local timeSinceLast = GetTime() - (private.pageQuerySent or 0)
-	if not canQuery and timeSinceLast < SMART_PROBE_INTERVAL then
+	if not canQuery then
+		-- bypass-метод удалён (давал echo/DUP и дроп probe):
+		-- всегда ждём реального снятия throttle и шлём настоящий запрос.
 		StartThrottlePoll()
 		return
 	end
