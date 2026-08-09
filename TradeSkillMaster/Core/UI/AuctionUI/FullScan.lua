@@ -310,8 +310,9 @@ function private.OnAbortClick()
 end
 
 function private.AbortScan()
-	ChatMessage.PrintfUser(L["Scan aborted by user."])
-	private.saveOnFinish = false
+	-- Save whatever has been scanned so far instead of discarding it.
+	-- saveOnFinish remains true (default), EndScan will commit partial scanData.
+	private.isPartialSave = true
 	private.EndScan()
 end
 
@@ -1001,15 +1002,26 @@ function private.EndScan()
 
 	local elapsed = GetTime() - (private.startTime or GetTime())
 	if save then
-		private.SafeUpdateUI(
-			string.format(L["Done! %d auctions, %d items in %.1fs (%s mode)"],
-				private.totalAuctions, recordCount, elapsed, private.mode or "?"),
-			1.0
-		)
-		ChatMessage.PrintfUser(string.format(
-			L["Full scan complete: %d auctions, %d items saved to local AuctionDB (%.1fs)"],
-			private.totalAuctions, recordCount, elapsed
-		))
+		if private.isPartialSave then
+			private.SafeUpdateUI(
+				string.format("Aborted – partial save: %d items in %.1fs", recordCount, elapsed),
+				0.5
+			)
+			ChatMessage.PrintfUser(string.format(
+				"[FullScan] Aborted – %d partial items saved to AuctionDB (%.1fs scanned)",
+				recordCount, elapsed
+			))
+		else
+			private.SafeUpdateUI(
+				string.format(L["Done! %d auctions, %d items in %.1fs (%s mode)"],
+					private.totalAuctions, recordCount, elapsed, private.mode or "?"),
+				1.0
+			)
+			ChatMessage.PrintfUser(string.format(
+				L["Full scan complete: %d auctions, %d items saved to local AuctionDB (%.1fs)"],
+				private.totalAuctions, recordCount, elapsed
+			))
+		end
 	else
 		private.SafeUpdateUI(L["Scan ended without saving."], 0)
 		ChatMessage.PrintfUser(L["Scan ended without saving to AuctionDB."])
@@ -1019,6 +1031,7 @@ function private.EndScan()
 		private.scanState = nil
 		private.scanData = nil
 		private.saveOnFinish = true
+		private.isPartialSave = nil
 		private.SafeUpdateUI(L["Idle"], 0)
 	end)
 end
