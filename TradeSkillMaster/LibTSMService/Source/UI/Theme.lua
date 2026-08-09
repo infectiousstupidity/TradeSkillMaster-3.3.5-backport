@@ -167,6 +167,16 @@ local CONSTANTS = {
 	SCROLLBAR_WIDTH = 4,
 	MOUSE_WHEEL_SCROLL_AMOUNT = 60,
 }
+local function GetNativeFont()
+	if GameFontNormal then
+		local fontPath = GameFontNormal:GetFont()
+		if fontPath and fontPath ~= "" then
+			return fontPath
+		end
+	end
+	return "Fonts\\ZYKai_C.ttf"
+end
+
 local OVERRIDE_FONT_PATHS = {
 	[FontObject.ALPHABET.ROMAN] = {
 		[FontObject.TYPE.BODY_REGULAR] = "Interface\\Addons\\TradeSkillMaster\\Media\\Montserrat-Regular.ttf",
@@ -179,6 +189,12 @@ local OVERRIDE_FONT_PATHS = {
 		[FontObject.TYPE.BODY_MEDIUM] = "Interface\\Addons\\TradeSkillMaster\\Media\\Montserrat-Medium.ttf",
 		[FontObject.TYPE.BODY_BOLD] = "Interface\\Addons\\TradeSkillMaster\\Media\\Montserrat-Bold.ttf",
 		[FontObject.TYPE.TABLE] = "Interface\\Addons\\TradeSkillMaster\\Media\\Roboto-Medium.ttf",
+	},
+	[FontObject.ALPHABET.CHINESE] = {
+		[FontObject.TYPE.BODY_REGULAR] = GetNativeFont(),
+		[FontObject.TYPE.BODY_MEDIUM] = GetNativeFont(),
+		[FontObject.TYPE.BODY_BOLD] = GetNativeFont(),
+		[FontObject.TYPE.TABLE] = GetNativeFont(),
 	},
 }
 

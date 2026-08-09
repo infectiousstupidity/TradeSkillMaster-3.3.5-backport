@@ -40,10 +40,20 @@ local ALPHABET_LOOKUP = {
 	zhTW = ALPHABET.CHINESE,
 	ruRU = ALPHABET.CYRILLIC,
 }
+local function GetNativeFont()
+	if GameFontNormal then
+		local fontPath = GameFontNormal:GetFont()
+		if fontPath and fontPath ~= "" then
+			return fontPath
+		end
+	end
+	return "Fonts\\ZYKai_C.ttf"
+end
+
 local DEFAULT_FONT_PATH = {
 	[ALPHABET.ROMAN] = "Fonts\\FRIZQT__.ttf",
 	[ALPHABET.KOREAN] = "Fonts\\2002.ttf",
-	[ALPHABET.CHINESE] = "Fonts\\ARKai_C.ttf",
+	[ALPHABET.CHINESE] = GetNativeFont(),
 	[ALPHABET.CYRILLIC] = "Fonts\\FRIZQT___CYR.ttf",
 }
 
@@ -171,8 +181,12 @@ function private.QueueFontLoad(path)
 	local resolvedPath = path
 	local fontSet = fontString:SetFont(path, 6, "")
 	if not fontSet then
-		resolvedPath = "Fonts\\FRIZQT__.ttf"
+		resolvedPath = GetNativeFont()
 		fontSet = fontString:SetFont(resolvedPath, 6, "")
+		if not fontSet then
+			resolvedPath = "Fonts\\FRIZQT__.ttf"
+			fontSet = fontString:SetFont(resolvedPath, 6, "")
+		end
 	end
 	if fontSet then
 		fontString:SetText("1")
