@@ -41,22 +41,23 @@ local private = {
 }
 
 local MAX_RETRY_PASSES = 3
-local RETRY_DELAY = 3 -- seconds between retry passes (getAll mode)
+local RETRY_DELAY = 1.5 -- seconds between retry passes (getAll mode)
 -- Paged mode: пропущенные линки добираем ЛОКАЛЬНО (повторный GetAuctionItemLink по тем же
 -- индексам), БЕЗ повторного QueryAuctionItems. Данные страницы остаются в буфере "list" до
 -- следующего query, а item-info ответы доходят за пару сотен мс. Это убирает целый server
 -- round-trip с каждой "грязной" страницы (старый путь re-query'ил страницу = +1 round-trip).
-local MAX_LINK_RESOLVE_PASSES = 2 -- локальных проходов по missing-линкам на страницу
-local LINK_RESOLVE_DELAY = 0.25 -- пауза, чтобы in-flight item-info ответы успели дойти
-local MIN_MISSING_FOR_RETRY = 15 -- добор включаем только если потеряли ≥30% страницы
+local MAX_LINK_RESOLVE_PASSES = 1 -- локальных проходов по missing-линкам на страницу
+local LINK_RESOLVE_DELAY = 0.05 -- пауза (50ms), чтобы in-flight item-info ответы успели дойти
+local MIN_MISSING_FOR_RETRY = 25 -- добор включаем только если потеряли ≥50% страницы
 -- Real echo (DUP): сервер вернул буфер предыдущей страницы. Обрабатывать его нельзя —
 -- предыдущая страница посчитается дважды, а реальная будет пропущена. Повторяем запрос
 -- той же страницы (с лимитом, чтобы не зациклиться на постоянно echo-ящем сервере).
 local MAX_DUP_REQUERIES = 3 -- повторов той же страницы при real echo
-local DUP_REQUERY_DELAY = 0.5 -- пауза перед повтором echo-страницы
+local DUP_REQUERY_DELAY = 0.15 -- пауза перед повтором echo-страницы
 -- Транзиентный пустой батч в середине скана: не считаем концом АХ, повторяем страницу.
 local MAX_EMPTY_PAGE_RETRIES = 2 -- повторов пустой страницы до принудительного финиша
-local EMPTY_PAGE_RETRY_DELAY = 1 -- пауза перед повтором пустой страницы
+local EMPTY_PAGE_RETRY_DELAY = 0.2 -- пауза перед повтором пустой страницы
+local SMART_PROBE_INTERVAL = 0.35 -- Probe interval on private servers (350ms instead of 1.0s client throttle)
 local DEBUG_LOG_EVERY_N_PAGES = 0 -- частота snapshot-сообщений в чат
 local DEBUG_LOG_RETRIES = false -- логировать каждый page retry в чат
 
@@ -142,7 +143,9 @@ private.throttlePollFrame:SetScript("OnUpdate", function(self, elapsed)
 		end
 		return
 	end
-	if CanSendAuctionQuery() then
+	local canQuery = CanSendAuctionQuery()
+	local timeSinceLast = GetTime() - (private.pageQuerySent or 0)
+	if canQuery or timeSinceLast >= SMART_PROBE_INTERVAL then
 		self:Hide()
 		self._elapsed = nil
 		if private.scanState == "paged" then
@@ -544,9 +547,8 @@ function private.QueryNextPage()
 	end
 
 	local canQuery = CanSendAuctionQuery()
-	if not canQuery then
-		-- bypass-метод удалён (давал echo/DUP и дроп probe):
-		-- всегда ждём реального снятия throttle и шлём настоящий запрос.
+	local timeSinceLast = GetTime() - (private.pageQuerySent or 0)
+	if not canQuery and timeSinceLast < SMART_PROBE_INTERVAL then
 		StartThrottlePoll()
 		return
 	end
