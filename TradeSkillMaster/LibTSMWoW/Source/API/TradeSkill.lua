@@ -249,7 +249,7 @@ function TradeSkill.GetName()
 		local info = C_TradeSkillUI.GetBaseProfessionInfo()
 		return info.parentProfessionName or info.professionName, info.profession
 	else
-		local name = TradeSkill.IsClassicCrafting() and GetCraftSkillLine(1) or GetTradeSkillLine()
+		local name = TradeSkill.IsClassicCrafting() and (GetCraftSkillLine and GetCraftSkillLine(1) or GetTradeSkillLine()) or GetTradeSkillLine()
 		return name
 	end
 end
@@ -664,8 +664,8 @@ end
 ---@return boolean
 function private.HasAllToolsInBags(toolsStr)
 	for toolName in gmatch(toolsStr, "[^,]+") do
-		toolName = strtrim(toolName)
-		if toolName ~= "" and not private.HasToolItemInBags(toolName) then
+		local tName = strtrim(toolName)
+		if tName ~= "" and not private.HasToolItemInBags(tName) then
 			return false
 		end
 	end

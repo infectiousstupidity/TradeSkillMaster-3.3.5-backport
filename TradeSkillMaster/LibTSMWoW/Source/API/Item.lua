@@ -348,6 +348,14 @@ function Item.IsUsable(link)
 	if type(link) ~= "string" then
 		return true
 	end
+	-- 3.3.5 native API check: IsUsableItem requires clean "item:ID" format (raw chat hyperlinks can crash C++ engine)
+	local itemStr = strmatch(link, "item:%d+:[%d:]+") or strmatch(link, "item:%d+")
+	if IsUsableItem and itemStr then
+		local ok, isUsable = pcall(IsUsableItem, itemStr)
+		if ok and isUsable == true then
+			return true
+		end
+	end
 	if not private.usableScanTooltip then
 		private.usableScanTooltip = CreateFrame("GameTooltip", "TSMUsableScanTooltip", UIParent, "GameTooltipTemplate")
 	end
@@ -362,6 +370,17 @@ function Item.IsUsable(link)
 		local text = textObj and textObj:GetText()
 		if not text or text == "" then
 			return false
+		end
+		-- 3.3.5 recipe fix: background tooltips render profession requirement lines
+		-- (e.g. "需要 烹饪", "Requires Cooking") in red when trade skill window is closed.
+		-- Do not treat profession skill requirements on recipes as unusable if player level is met.
+		if text:find("需要", 1, true) or text:find("Requires", 1, true) then
+			local reqLevel = text:match("%d+")
+			reqLevel = reqLevel and tonumber(reqLevel)
+			local playerLevel = UnitLevel and UnitLevel("player") or 80
+			if not reqLevel or reqLevel <= playerLevel then
+				return false
+			end
 		end
 		local r, g, b = textObj:GetTextColor()
 		-- The client colors unmet requirements red (RED_FONT_COLOR = 1.0, 0.1, 0.1)

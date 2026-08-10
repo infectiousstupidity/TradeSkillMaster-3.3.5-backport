@@ -21,6 +21,11 @@ if not _G.WOW_PROJECT_ID then
 	_G.WOW_PROJECT_ID = _G.WOW_PROJECT_WRATH_CLASSIC
 end
 
+-- Enable global debug mode by default on 3.3.5a so all errors popup in copyable window
+if _G.TSM_GLOBAL_DEBUG == nil then
+	_G.TSM_GLOBAL_DEBUG = true
+end
+
 -- ============================================================================
 -- C_AddOns
 -- ============================================================================
@@ -259,6 +264,17 @@ do
 end
 
 -- ----------------------------------------------------------------------------
+-- Classic Crafting API Fallbacks for 3.3.5a
+_G.GetCraftSkillLine        = _G.GetCraftSkillLine        or function(...) return (_G.GetCraftDisplaySkillLine and _G.GetCraftDisplaySkillLine()) or (_G.GetTradeSkillLine and _G.GetTradeSkillLine() or "") end
+_G.GetCraftItemLink         = _G.GetCraftItemLink         or function(...) return _G.GetTradeSkillItemLink and _G.GetTradeSkillItemLink(...) end
+_G.GetCraftIcon             = _G.GetCraftIcon             or function(...) return _G.GetTradeSkillIcon and _G.GetTradeSkillIcon(...) end
+_G.GetCraftSpellFocus       = _G.GetCraftSpellFocus       or function(...) return _G.GetTradeSkillTools and _G.GetTradeSkillTools(...) end
+_G.GetCraftNumReagents      = _G.GetCraftNumReagents      or function(...) return _G.GetTradeSkillNumReagents and _G.GetTradeSkillNumReagents(...) end
+_G.GetCraftReagentItemLink  = _G.GetCraftReagentItemLink  or function(...) return _G.GetTradeSkillReagentItemLink and _G.GetTradeSkillReagentItemLink(...) end
+_G.GetCraftReagentInfo      = _G.GetCraftReagentInfo      or function(...) return _G.GetTradeSkillReagentInfo and _G.GetTradeSkillReagentInfo(...) end
+_G.GetCraftInfo             = _G.GetCraftInfo             or function(...) return _G.GetTradeSkillInfo and _G.GetTradeSkillInfo(...) end
+_G.GetCraftRecipeLink       = _G.GetCraftRecipeLink       or function(...) return _G.GetTradeSkillRecipeLink and _G.GetTradeSkillRecipeLink(...) end
+
 -- C_TradeSkillUI stub methods
 -- 60 call sites in LibTSMWoW/Source/API/TradeSkill.lua. All gated behind
 -- HasFeature(C_TRADE_SKILL_UI) at runtime — these no-ops only protect the

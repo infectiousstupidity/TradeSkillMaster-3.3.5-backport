@@ -844,7 +844,8 @@ function private.ProcessBrowseResultClassic(index)
 	private.query:_ProcessBrowseResult(baseItemString, itemLink)
 	private.query:_MarkDirtyRow(baseItemString)
 	local row = private.query:_GetBrowseResults(baseItemString)
-	row:PopulateSubRows(private.browseId, index, itemLink)
+	local page = (private.query and private.query._page) or 0
+	row:PopulateSubRows(private.browseId, index, itemLink, page)
 	cs.added = cs.added + 1
 	-- Classic browse rows always have raw data for newly populated listings,
 	-- so no need to scan all existing subRows on every auction index.

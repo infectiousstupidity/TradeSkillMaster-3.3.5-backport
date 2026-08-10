@@ -47,66 +47,58 @@ function ErrorFrame.__private:__init()
 	local frame = CreateFrame("Frame", nil, UIParent, template)
 	self._frame = frame
 	frame:Hide()
-	frame:SetWidth(500)
-	frame:SetHeight(400)
+	frame:SetWidth(640)
+	frame:SetHeight(460)
 	frame:SetFrameStrata("FULLSCREEN_DIALOG")
-	frame:SetPoint("RIGHT", -100, 0)
+	frame:SetPoint("CENTER", 0, 0)
+	frame:SetMovable(true)
+	frame:EnableMouse(true)
+	frame:RegisterForDrag("LeftButton")
+	frame:SetScript("OnDragStart", frame.StartMoving)
+	frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 	frame:SetBackdrop(FRAME_BACKDROP)
-	frame:SetBackdropColor(0, 0, 0, 1)
-	frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+	frame:SetBackdropColor(0.05, 0.05, 0.05, 0.95)
+	frame:SetBackdropBorderColor(0.8, 0.2, 0.2, 1)
 	frame:SetScript("OnHide", self:__closure("_HandleHide"))
 
 	local title = frame:CreateFontString()
-	title:SetHeight(20)
+	title:SetHeight(22)
 	title:SetPoint("TOPLEFT", 0, -10)
 	title:SetPoint("TOPRIGHT", 0, -10)
 	title:SetFontObject(GameFontNormalLarge)
-	title:SetTextColor(1, 1, 1, 1)
+	title:SetTextColor(1, 0.4, 0.4, 1)
 	title:SetJustifyH("CENTER")
 	title:SetJustifyV("MIDDLE")
-	title:SetText("TSM Error Window ("..LibTSMUI.GetVersionStr()..")")
+	title:SetText("TSM 错误调试窗口 ("..LibTSMUI.GetVersionStr()..")")
 
 	local hLine = frame:CreateTexture(nil, "ARTWORK")
 	hLine:SetHeight(2)
-	hLine:SetColorTexture(0.3, 0.3, 0.3, 1)
-	hLine:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
-	hLine:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -10)
+	hLine:SetColorTexture(0.5, 0.2, 0.2, 1)
+	hLine:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+	hLine:SetPoint("TOPRIGHT", title, "BOTTOMRIGHT", 0, -6)
 
 	local text = frame:CreateFontString()
 	frame.text = text
-	text:SetHeight(45)
-	text:SetPoint("TOPLEFT", hLine, "BOTTOMLEFT", 8, -8)
-	text:SetPoint("TOPRIGHT", hLine, "BOTTOMRIGHT", -8, -8)
+	text:SetHeight(32)
+	text:SetPoint("TOPLEFT", hLine, "BOTTOMLEFT", 8, -4)
+	text:SetPoint("TOPRIGHT", hLine, "BOTTOMRIGHT", -8, -4)
 	text:SetFontObject(GameFontNormal)
-	text:SetTextColor(1, 1, 1, 1)
+	text:SetTextColor(0.9, 0.9, 0.9, 1)
 	text:SetJustifyH("LEFT")
 	text:SetJustifyV("MIDDLE")
+	text:SetText("TradeSkillMaster 运行错误报告 (点击文本框按 Cmd+C / Ctrl+C 即可直接复制):")
 
 	local switchBtn = CreateFrame("Button", nil, frame)
 	frame.switchBtn = switchBtn
-	switchBtn:SetPoint("TOPRIGHT", -4, -10)
-	switchBtn:SetWidth(100)
-	switchBtn:SetHeight(20)
-	local fontString = switchBtn:CreateFontString()
-	fontString:SetFontObject(GameFontNormalSmall)
-	fontString:SetJustifyH("CENTER")
-	fontString:SetJustifyV("MIDDLE")
-	switchBtn:SetFontString(fontString)
-	switchBtn:SetScript("OnClick", self:__closure("_HandleSwitchClick"))
-	if LibTSMUI.IsDevVersion() then
-		local fullBtn = CreateFrame("Button", nil, frame)
-		frame.fullBtn = fullBtn
-		fullBtn:SetPoint("BOTTOM", 0, 10)
-		fullBtn:SetWidth(100)
-		fullBtn:SetHeight(20)
-		local fontString2 = fullBtn:CreateFontString()
-		fontString2:SetFontObject(GameFontNormalSmall)
-		fontString2:SetJustifyH("CENTER")
-		fontString2:SetJustifyV("MIDDLE")
-		fullBtn:SetFontString(fontString2)
-		fullBtn:SetText("Show Full Error")
-		fullBtn:SetScript("OnClick", self:__closure("_HandleFullErrorClick"))
-	end
+	switchBtn:Hide()
+
+	local fullBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.fullBtn = fullBtn
+	fullBtn:SetPoint("TOPRIGHT", -8, -10)
+	fullBtn:SetWidth(120)
+	fullBtn:SetHeight(22)
+	fullBtn:SetText("展开完整信息")
+	fullBtn:SetScript("OnClick", self:__closure("_HandleFullErrorClick"))
 
 	local hLine2 = frame:CreateTexture(nil, "ARTWORK")
 	hLine2:SetHeight(2)
@@ -117,55 +109,56 @@ function ErrorFrame.__private:__init()
 	local scrollFrame = CreateFrame("ScrollFrame", "TSMErrorFrameScrollFrame"..tostring(math.random(1, 999999)), frame, "UIPanelScrollFrameTemplate")
 	frame.scrollFrame = scrollFrame
 	scrollFrame:SetPoint("TOPLEFT", hLine2, "BOTTOMLEFT", 8, -4)
-	scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 38)
+	scrollFrame:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -26, 42)
 
 	local editBox = CreateFrame("EditBox", nil, scrollFrame)
 	frame.editBox = editBox
-	editBox:SetWidth(scrollFrame:GetWidth())
+	editBox:SetWidth(scrollFrame:GetWidth() - 10)
 	editBox:SetFontObject(ChatFontNormal)
 	editBox:SetMultiLine(true)
 	editBox:SetAutoFocus(false)
 	editBox:SetMaxLetters(0)
 	editBox:SetTextColor(1, 1, 1, 1)
 	editBox:SetScript("OnUpdate", self:__closure("_HandleEditUpdate"))
-	editBox:SetScript("OnEditFocusGained", self:__closure("_HandleEditFocusGained"))
-	editBox:SetScript("OnCursorChanged", self:__closure("_HandleEditCursorChanged"))
-	editBox:SetScript("OnTextChanged", self:__closure("_HandleEditTextChanged"))
 	editBox:SetScript("OnEscapePressed", self:__closure("_HandleEditEscapePressed"))
 	scrollFrame:SetScrollChild(editBox)
 
 	local hLine3 = frame:CreateTexture(nil, "ARTWORK")
 	hLine3:SetHeight(2)
 	hLine3:SetColorTexture(0.3, 0.3, 0.3, 1)
-	hLine3:SetPoint("BOTTOMLEFT", frame, 0, 35)
-	hLine3:SetPoint("BOTTOMRIGHT", frame, 0, 35)
+	hLine3:SetPoint("BOTTOMLEFT", frame, 0, 38)
+	hLine3:SetPoint("BOTTOMRIGHT", frame, 0, 38)
 
 	local reloadBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	frame.reloadBtn = reloadBtn
-	reloadBtn:SetPoint("BOTTOMLEFT", 4, 4)
+	reloadBtn:SetPoint("BOTTOMLEFT", 8, 6)
 	reloadBtn:SetWidth(120)
-	reloadBtn:SetHeight(30)
+	reloadBtn:SetHeight(28)
 	reloadBtn:SetText(RELOADUI)
 	reloadBtn:SetScript("OnClick", self:__closure("_HandleReloadClick"))
 
+	local selectBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	frame.selectBtn = selectBtn
+	selectBtn:SetPoint("BOTTOM", 0, 6)
+	selectBtn:SetWidth(160)
+	selectBtn:SetHeight(28)
+	selectBtn:SetText("全选文本 (复制)")
+	selectBtn:SetScript("OnClick", function()
+		editBox:SetFocus()
+		editBox:HighlightText()
+	end)
+
 	local closeBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
 	frame.closeBtn = closeBtn
-	closeBtn:SetPoint("BOTTOMRIGHT", -4, 4)
+	closeBtn:SetPoint("BOTTOMRIGHT", -8, 6)
 	closeBtn:SetWidth(120)
-	closeBtn:SetHeight(30)
-	closeBtn:SetText(DONE)
+	closeBtn:SetHeight(28)
+	closeBtn:SetText(CLOSE)
 	closeBtn:SetScript("OnClick", self:__closure("_HandleCloseClick"))
 
 	local stepsText = frame:CreateFontString()
 	frame.stepsText = stepsText
-	stepsText:SetWidth(200)
-	stepsText:SetHeight(30)
-	stepsText:SetPoint("BOTTOM", 0, 4)
-	stepsText:SetFontObject(GameFontNormal)
-	stepsText:SetTextColor(1, 0, 0, 1)
-	stepsText:SetJustifyH("CENTER")
-	stepsText:SetJustifyV("MIDDLE")
-	stepsText:SetText("Please enter steps before submitting")
+	stepsText:Hide()
 end
 
 
@@ -184,31 +177,16 @@ function ErrorFrame:Show(errorStr, errorInfo, fullErrorInfo, isManual)
 	self._errorInfo = errorInfo
 	self._fullErrorInfo = fullErrorInfo
 	self._isManual = isManual
-	local showError = isManual or LibTSMUI.IsDevVersion()
-	self._showingError = showError
-	self._details = STEPS_TEXT
+	self._showingError = true
+	self._details = errorStr
 	local frame = self._frame
 	frame:Show()
-	if showError then
-		-- This is a dev version or manual error so show the error (only)
-		frame.text:SetText("Looks like TradeSkillMaster has encountered an error.")
-		frame.switchBtn:SetText("Hide Error")
-		if LibTSMUI.IsDevVersion() then
-			frame.fullBtn:Show()
-			frame.stepsText:Hide()
-		else
-			frame.stepsText:Show()
-		end
-		frame.editBox:SetText(errorStr)
-	else
-		frame.text:SetText("Looks like TradeSkillMaster has encountered an error. Please provide the steps which lead to this error to help the TSM team fix it, then click either button at the bottom of the window to automatically report this error.")
-		frame.switchBtn:SetText("Show Error")
-		if LibTSMUI.IsDevVersion() then
-			frame.fullBtn:Hide()
-		end
-		frame.stepsText:Show()
-		frame.editBox:SetText(STEPS_TEXT)
-	end
+	frame.text:SetText("TradeSkillMaster 运行错误报告 (点击文本框按 Cmd+C / Ctrl+C 即可直接复制):")
+	frame.fullBtn:Show()
+	frame.stepsText:Hide()
+	frame.editBox:SetText(errorStr)
+	frame.editBox:SetFocus()
+	frame.editBox:HighlightText()
 end
 
 ---Hides the error frame.
@@ -277,27 +255,8 @@ function ErrorFrame.__private:_HandleEditUpdate(editBox)
 	editBox:SetHitRectInsets(0, 0, offset, editBox:GetHeight() - offset - self._frame.scrollFrame:GetHeight())
 end
 
-function ErrorFrame.__private:_HandleEditFocusGained(editBox)
-	editBox:HighlightText()
-end
-
-function ErrorFrame.__private:_HandleEditCursorChanged(editBox)
-	if self._showingError and editBox:HasFocus() then
-		editBox:HighlightText()
-	end
-end
-
-function ErrorFrame.__private:_HandleEditTextChanged(editBox, isUserInput)
-	if isUserInput and self._showingError then
-		editBox:SetText(self._fullErrorInfo.str or self._errorStr)
-		editBox:HighlightText()
-	end
-end
-
 function ErrorFrame.__private:_HandleEditEscapePressed(editBox)
-	if self._showingError then
-		editBox:HighlightText(0, 0)
-	end
+	editBox:HighlightText(0, 0)
 	editBox:ClearFocus()
 end
 

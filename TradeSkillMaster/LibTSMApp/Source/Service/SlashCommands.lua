@@ -77,13 +77,32 @@ function private.OnChatCommand(input)
 	local cmd, args = strmatch(input, "^([^ ]*) ?(.*)$")
 	cmd = strlower(cmd)
 	if cmd == "debug" then
-		cmd, args = strmatch(args, "^([^ ]*) ?(.*)$")
-		local info = private.debugCommandInfo[cmd]
-		if not info then
-			-- Just silently ignore invalid debug commands
+		local subCmd, subArgs = strmatch(args, "^([^ ]*) ?(.*)$")
+		subCmd = subCmd and strlower(subCmd) or ""
+		if subCmd == "" or subCmd == "toggle" or subCmd == "on" or subCmd == "off" then
+			if subCmd == "on" then
+				_G.TSM_GLOBAL_DEBUG = true
+			elseif subCmd == "off" then
+				_G.TSM_GLOBAL_DEBUG = false
+			else
+				_G.TSM_GLOBAL_DEBUG = not _G.TSM_GLOBAL_DEBUG
+			end
+			ChatMessage.PrintfUserRaw("|cffffaa00[TSM Debug]|r 调试模式: %s (所有报错均在可复制窗口弹出, 支持 /tsm debug error 测试)", _G.TSM_GLOBAL_DEBUG and "|cff00ff00已开启 (ON)|r" or "|cffff0000已关闭 (OFF)|r")
 			return
 		end
-		info.callback(args)
+		local info = private.debugCommandInfo[subCmd]
+		if not info then
+			ChatMessage.PrintfUserRaw("|cffffaa00[TSM Debug]|r 可用指令: /tsm debug [on|off|error]")
+			return
+		end
+		info.callback(subArgs)
+	elseif cmd == "error" then
+		local info = private.debugCommandInfo["error"]
+		if info then
+			info.callback(args)
+		else
+			ChatMessage.PrintUser("Error frame handler not registered.")
+		end
 	elseif cmd == "" and private.baseCommandInfo then
 		private.RunCommand(private.baseCommandInfo, args, input)
 	elseif private.commandInfo[cmd] then

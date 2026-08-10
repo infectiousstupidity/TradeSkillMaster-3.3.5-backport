@@ -319,7 +319,8 @@ end
 ---@param browseId number The ID of the browse query
 ---@param index? number The item index
 ---@param itemLink? string The item link
-function AuctionRow:PopulateSubRows(browseId, index, itemLink)
+---@param page? number The auction house page number
+function AuctionRow:PopulateSubRows(browseId, index, itemLink, page)
 	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
 		assert(self._searchIndex and not index)
 		local subRowOffset = self._searchIndex * SUB_ROW_SEARCH_INDEX_MULTIPLIER
@@ -349,7 +350,7 @@ function AuctionRow:PopulateSubRows(browseId, index, itemLink)
 		-- Remove any prior results with a different browseId
 		assert(index and not self._searchIndex)
 		local subRow = AuctionSubRow.Get(self)
-		subRow:_SetRawData(index, browseId, itemLink)
+		subRow:_SetRawData(index, browseId, itemLink, page)
 		local _, hashNoSeller = subRow:GetHashes()
 		if self._minBrowseId and self._minBrowseId ~= browseId then
 			-- Check if this subRow already exists with a prior browseId

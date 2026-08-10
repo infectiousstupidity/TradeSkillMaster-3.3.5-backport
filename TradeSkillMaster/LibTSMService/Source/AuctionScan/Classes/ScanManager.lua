@@ -708,12 +708,17 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 			return self._findResult
 		end
 
-		-- per-item query, page=0..maxPage
-		local page, maxPage = 0, nil
+		-- per-item query, jumping straight to initial targetPage (Auctionator-style direct jump)
+		local initialTargetPage = (row.GetPage and row:GetPage()) or 0
+		local visitedPages = {}
+		local page = initialTargetPage
+		local maxPage = nil
+		local fallbackCandidate = 0
 		-- 3.3.5 FAST_FIND_POC fix: tracks whether the current page's data fully settled;
 		-- when it didn't (timeout), we must not trust the early-stop heuristic below.
 		local fastPageSettled = true
 		while true do
+			visitedPages[page] = true
 			if self._findQuery then
 				self._findQuery:Release()
 				self._findQuery = nil
@@ -821,22 +826,23 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 				return nil
 			end
 
+			local numPages = AuctionHouse.GetNumPages() or 1
+			maxPage = maxPage or math.max(0, numPages - 1)
+
 			-- If the current page's last auction indicates the item cannot be on a later page,
-			-- stop early instead of scanning all pages.
-			-- 3.3.5 FAST_FIND_POC fix: only trust the early-stop heuristic when the page
-			-- data fully settled; with partial data the last row's buyout/stackSize can be
-			-- nil/garbage and the heuristic wrongly aborts the find on page 0, producing
-			-- the false "Failed to find auction" result for lots on later pages.
-			if fastPageSettled and not self:_FindAuctionCanBeOnLaterPage(row) then
+			-- stop early instead of scanning all pages. Only valid when scanning sequentially from page 0 upwards.
+			if page == fallbackCandidate and fastPageSettled and not self:_FindAuctionCanBeOnLaterPage(row) then
 				break
 			end
-			local numPages = AuctionHouse.GetNumPages()
-			maxPage = maxPage or (numPages - 1)
-			if page < maxPage then
-				page = page + 1
-			else
+
+			-- Advance to next unvisited fallback page from 0 upwards
+			while visitedPages[fallbackCandidate] and fallbackCandidate <= maxPage do
+				fallbackCandidate = fallbackCandidate + 1
+			end
+			if fallbackCandidate > maxPage then
 				break
 			end
+			page = fallbackCandidate
 		end
 		-- pass 1 ничего не дал — если был с seller-strict и owner не "?", дел��ем pass 2
 		-- Если passFlag (noSeller) уже true — выходим, ничего не нашли

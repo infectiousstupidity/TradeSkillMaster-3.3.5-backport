@@ -275,6 +275,13 @@ function AuctionSubRow:GetListingInfo()
 	return self._timeLeft, self._auctionId, self._browseId
 end
 
+---Gets the page number from the initial scan (for fast direct jump).
+---@return number
+function AuctionSubRow:GetPage()
+	return self._page or 0
+end
+
+
 ---Gets the quantities.
 ---@return number quantity
 ---@return number numAuctions
@@ -450,10 +457,11 @@ end
 -- Private Class Methods
 -- ============================================================================
 
-function AuctionSubRow:_SetRawData(data, browseId, itemLink)
+function AuctionSubRow:_SetRawData(data, browseId, itemLink, page)
 	self._hash = nil
 	self._hashNoSeller = nil
 	self._browseId = browseId
+	self._page = page or 0
 	self._sniperKept = false
 	self._sniperMaxPrice = nil
 	if data then

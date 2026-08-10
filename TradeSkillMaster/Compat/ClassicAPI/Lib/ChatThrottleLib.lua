@@ -469,7 +469,11 @@ function ChatThrottleLib:SendAddonMessage(prio, prefix, text, chattype, target, 
 	local nSize = prefix:len() + 1 + text:len();
 
 	if nSize>255 then
-		error("ChatThrottleLib:SendAddonMessage(): prefix + message length cannot exceed 254 bytes", 2)
+		local maxAllowed = 254 - prefix:len()
+		if maxAllowed > 0 then
+			text = text:sub(1, maxAllowed)
+			nSize = prefix:len() + 1 + text:len()
+		end
 	end
 
 	nSize = nSize + self.MSG_OVERHEAD;

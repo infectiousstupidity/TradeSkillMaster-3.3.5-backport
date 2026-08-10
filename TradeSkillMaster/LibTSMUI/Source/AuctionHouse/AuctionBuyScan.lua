@@ -648,8 +648,13 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 			end
 		else
 			assert(selection:IsSubRow())
-			-- Find the auction
-			manager:ProcessAction("ACTION_FIND_SELECTED_AUCTION")
+			-- 3.3.5 Auctionator-style instant selection:
+			-- When the search is complete, the search results are already in memory.
+			-- Do NOT trigger an eager background query or enter "Finding Selected Auction".
+			-- The selection is immediately actionable, and Buy/Bid will execute on demand.
+			if not (LibTSMUI.IsVanillaClassic() or LibTSMUI.IsBCClassic() or LibTSMUI.IsWrathClassic()) then
+				manager:ProcessAction("ACTION_FIND_SELECTED_AUCTION")
+			end
 		end
 	elseif action == "ACTION_SET_SELECTED_AUCTION" then
 		local selection = ... ---@type AuctionRow|AuctionSubRow|nil
@@ -666,6 +671,24 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 			state.selectionCanBuy = not isPlayerOrAlt and state.auctionScan:CanBuy(selection)
 			state.selectionCanCancel = (not LibTSMUI.IsVanillaClassic() and not LibTSMUI.IsBCClassic() and not LibTSMUI.IsWrathClassic()) and self._isPlayerFunc(ownerStr, false)
 			state.findHashIsSelection = state.findHash == selection:GetHashes()
+
+			-- 3.3.5 Auctionator-style instant selection:
+			-- The search result state is already in memory. Immediately enable Buy/Bid
+			-- with findDeferred = true and a ready placeholder findResult so the UI
+			-- never shows "Finding Selected Auction..." or blocks user interaction.
+			if LibTSMUI.IsVanillaClassic() or LibTSMUI.IsBCClassic() or LibTSMUI.IsWrathClassic() then
+				state.findDeferred = true
+				state.findHash = selection:GetHashes()
+				state.findHashIsSelection = true
+				state.findResult = { 1 } -- Ready sentinel so isSearchingForSelection is false
+				local quantity, numAuctions = selection:GetQuantities()
+				state.numFound = numAuctions or 1
+				state.maxQuantity = numAuctions or 1
+				state.defaultBuyQuantity = 1
+				state.numBid = 0
+				state.numBought = 0
+				state.numConfirmed = 0
+			end
 		else
 			state.selectedAuction = selection
 			state.selectionCanBid = false
@@ -673,6 +696,7 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 			state.selectionCanCancel = false
 			state.findHashIsSelection = false
 			state.findResult = nil
+			state.findDeferred = false
 		end
 		local postContext = self:_GetPostContext()
 		state.selectionCanPost = postContext and postContext:CanPost() or false
@@ -683,12 +707,37 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 		assert(state.selectedAuction and state.selectedAuction:IsSubRow())
 		state.findHash = state.selectedAuction:GetHashes()
 		state.findHashIsSelection = true
-		state.findResult = nil
-		-- 3.3.5 buy-after-buy fix: after a failed buy the client "list" is stale
-		-- (bought rows reflowed the server list), so the retry find must skip the
-		-- current-page shortcut and do a fresh per-item query. One-shot.
+		
+		-- 3.3.5 instant selection fix (Auctionator-style):
+		-- If the selected auction is already present on the current live AH page,
+		-- resolve its matches synchronously INLINE without setting findResult = nil
+		-- or showing "Finding Selected Auction...".
 		local forceQuery = self._findForceQuery
 		self._findForceQuery = nil
+		local matches = nil
+		if not forceQuery and (LibTSMUI.IsVanillaClassic() or LibTSMUI.IsBCClassic() or LibTSMUI.IsWrathClassic()) and GetNumAuctionItems then
+			for i = 1, (GetNumAuctionItems("list") or 0) do
+				if state.selectedAuction:EqualsIndex(i, false) or state.selectedAuction:EqualsIndex(i, true) then
+					matches = matches or {}
+					tinsert(matches, i)
+				end
+			end
+		end
+		if matches then
+			AuctionScan.ReleaseLock(state.scanTypeName)
+			state.findDeferred = false
+			state.findResult = matches
+			local maxQuantity = state.searchContext:GetMaxCanBuy(state.selectedAuction:GetItemString())
+			state.numFound = min(#matches, maxQuantity and Math.Ceil(maxQuantity / state.selectedAuction:GetQuantities()) or math.huge)
+			state.maxQuantity = maxQuantity and min(maxQuantity, state.numFound) or 1
+			state.defaultBuyQuantity = state.numFound
+			state.numBid = 0
+			state.numBought = 0
+			state.numConfirmed = 0
+			return
+		end
+
+		state.findResult = nil
 		state.auctionScan:FindAuction(state.selectedAuction, manager:CallbackToProcessAction("ACTION_HANDLE_FIND_RESULT"), false, forceQuery)
 	elseif action == "ACTION_HANDLE_FIND_RESULT" then
 		local result = ...
@@ -730,13 +779,28 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 			-- 3.3.5: продолжаем отложенный buy/bid если find был запущен из кнопки покупки
 			if state.pendingBuyOnFind then
 				state.pendingBuyOnFind = false
-				-- ACTION_BUY_AUCTION will run resume-after-buy on its own success path;
-				-- if scan was paused only for find-on-demand, leave the flag so a later
-				-- BUYOUT_FUTURE_DONE can resume cleanly.
-				return manager:ProcessAction("ACTION_BUY_AUCTION")
+				if LibTSMUI.IsVanillaClassic() or LibTSMUI.IsBCClassic() or LibTSMUI.IsWrathClassic() then
+					-- On 3.3.5a, PlaceAuctionBid is protected and CANNOT be called asynchronously from a thread callback.
+					-- Now that findResult is cached, notify user to click Buyout again in their hardware event.
+					ChatMessage.PrintfUser("已在拍卖行定位该物品，请再次点击【一口价/购买】。")
+					if self._resumeAfterFind then
+						self._resumeAfterFind = false
+						manager:ProcessAction("ACTION_RESUME_SCAN")
+					end
+				else
+					return manager:ProcessAction("ACTION_BUY_AUCTION")
+				end
 			elseif state.pendingBidOnFind then
 				state.pendingBidOnFind = false
-				return manager:ProcessAction("ACTION_BID_AUCTION")
+				if LibTSMUI.IsVanillaClassic() or LibTSMUI.IsBCClassic() or LibTSMUI.IsWrathClassic() then
+					ChatMessage.PrintfUser("已在拍卖行定位该物品，请再次点击【竞标】。")
+					if self._resumeAfterFind then
+						self._resumeAfterFind = false
+						manager:ProcessAction("ACTION_RESUME_SCAN")
+					end
+				else
+					return manager:ProcessAction("ACTION_BID_AUCTION")
+				end
 			end
 			if self._resumeAfterFind then
 				self._resumeAfterFind = false

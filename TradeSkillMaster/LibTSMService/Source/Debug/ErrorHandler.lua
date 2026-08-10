@@ -156,22 +156,20 @@ function private.ErrorHandler(msg, thread, isSilent, isManual)
 	-- Build stack trace with locals and get addon name
 	local stackInfo, newMsg = private.GetStackInfo(msg, thread)
 	msg = newMsg
-	local addonName = isSilent and "TradeSkillMaster" or nil
+	local addonName = (isSilent or _G.TSM_GLOBAL_DEBUG) and "TradeSkillMaster" or nil
 	for _, info in ipairs(stackInfo) do
 		if not addonName then
-			addonName = strmatch(info.file, "[A-Za-z]+%.lua") and private.IsTSMAddon(info.file) or nil
+			addonName = (strmatch(info.file, "[A-Za-z0-9_]+%.lua") and private.IsTSMAddon(info.file)) or nil
 		end
 	end
-	if not isManual and addonName ~= "TradeSkillMaster" then
+	if not isManual and not _G.TSM_GLOBAL_DEBUG and addonName ~= "TradeSkillMaster" then
 		-- Not a TSM error
 		private.ignoreErrors = false
 		return false
 	end
 
-	if not LibTSMService.IsDevVersion() and not isManual then
-		-- Log the error (use a format string in case there are '%' characters in the msg)
-		Log.Err("%s", msg)
-	end
+	-- Always log the error
+	Log.Err("%s", msg)
 
 	if private.isShown then
 		-- Already showing an error, so suppress this one and return
@@ -436,7 +434,8 @@ function private.ParseLocals(locals, file)
 	locals = gsub(locals, "<table> {", "{")
 
 	local level = 0
-	for localLine in gmatch(locals, "[^\n]+") do
+	for rawLine in gmatch(locals, "[^\n]+") do
+		local localLine = rawLine
 		local shouldIgnoreLine = false
 		if strmatch(localLine, "^ *%(%*temporary%) = nil") then
 			-- ignore nil temporary variables
@@ -533,24 +532,19 @@ function private.ParseLocals(locals, file)
 end
 
 function private.IsTSMAddon(str)
+	if not str then return nil end
 	if strfind(str, "Auc-Adcanced[\\/]CoreScan.lua") then
 		-- ignore auctioneer errors
 		return nil
-	elseif strfind(str, "Master[\\/]External[\\/]") then
-		-- ignore errors from libraries
+	elseif strfind(str, "Master[\\/]External[\\/]") and not _G.TSM_GLOBAL_DEBUG then
+		-- ignore errors from libraries unless global debug
 		return nil
-	elseif strfind(str, "Master[\\/]Core[\\/]API.lua") then
+	elseif strfind(str, "Master[\\/]Core[\\/]API.lua") and not _G.TSM_GLOBAL_DEBUG then
 		-- ignore errors from public APIs
 		return nil
 	elseif strfind(str, "Master_AppHelper[\\/]") then
 		return "TradeSkillMaster_AppHelper"
-	elseif strfind(str, "lMaster[\\/]") then
-		return "TradeSkillMaster"
-	elseif strfind(str, "ster[\\/]Core[\\/]UI[\\/]") then
-		return "TradeSkillMaster"
-	elseif strfind(str, "r[\\/]LibTSM[\\/]") then
-		return "TradeSkillMaster"
-	elseif strfind(str, "^TSM[\\/]") then
+	elseif strfind(str, "TradeSkillMaster") or strfind(str, "TSM") or strfind(str, "LibTSM") or strfind(str, "Compat") then
 		return "TradeSkillMaster"
 	end
 	return nil
@@ -563,12 +557,10 @@ function private.AddonBlockedHandler(event, addonName, addonFunc)
 	-- just log it - it might not be TSM that cause the taint
 	Log.Err("[%s] AddOn '%s' tried to call the protected function '%s'.", event, addonName or "<name>", addonFunc or "<func>")
 
-	if LibTSMService.IsDevVersion() then
-		local status, ret = pcall(private.ErrorHandler, "BLOCKED", nil, false, false)
-		if not status and not private.hitInternalError then
-			private.hitInternalError = true
-			print("Internal TSM error: "..tostring(ret))
-		end
+	local status, ret = pcall(private.ErrorHandler, "BLOCKED: "..tostring(addonFunc), nil, false, false)
+	if not status and not private.hitInternalError then
+		private.hitInternalError = true
+		print("Internal TSM error: "..tostring(ret))
 	end
 end
 
@@ -606,14 +598,18 @@ do
 		end
 		if tsmErrMsg then
 			-- look at the stack trace to see if this is a TSM error
+			local isTSM = false
 			for i = 2, MAX_STACK_DEPTH do
 				local stackLine = Debug.Stack(i, 1, 0)
-				if not strmatch(stackLine, "^%[C%]:") and not strmatch(stackLine, "[%(%[]tail call[%)%]]:") and not strmatch(stackLine, "%[tsm error check%]") and not strmatch(stackLine, "^%[string \"[^@]") and not strmatch(stackLine, "lMaster[\\/]External[\\/][A-Za-z0-9%-_%.]+[\\/]") and not strmatch(stackLine, "SharedXML") and not strmatch(stackLine, "CallbackHandler") and not strmatch(stackLine, "!BugGrabber") and not strmatch(stackLine, "ErrorHandler%.lua") then
-					if not private.IsTSMAddon(stackLine) then
-						tsmErrMsg = nil
+				if not strmatch(stackLine, "^%[C%]:") and not strmatch(stackLine, "[%(%[]tail call[%)%]]:") and not strmatch(stackLine, "%[tsm error check%]") and not strmatch(stackLine, "^%[string \"[^@]") and not strmatch(stackLine, "SharedXML") and not strmatch(stackLine, "CallbackHandler") and not strmatch(stackLine, "!BugGrabber") and not strmatch(stackLine, "ErrorHandler%.lua") then
+					if private.IsTSMAddon(stackLine) or _G.TSM_GLOBAL_DEBUG then
+						isTSM = true
 					end
 					break
 				end
+			end
+			if not isTSM and not _G.TSM_GLOBAL_DEBUG then
+				tsmErrMsg = nil
 			end
 		end
 		if tsmErrMsg then

@@ -146,8 +146,13 @@ do
 			end
 			return tostring(k)
 		end,
-		__newindex = function()
-			error("Cannot write to the locale table")
+		__newindex = function(_, k, v)
+			local target = private.loadingLocale and private.tables[private.loadingLocale] or private.tables[private.activeLocale or "enUS"]
+			if target then
+				rawset(target, k, v)
+			else
+				error("Cannot write to the locale table")
+			end
 		end,
 	})
 
