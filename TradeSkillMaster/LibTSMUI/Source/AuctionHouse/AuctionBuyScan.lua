@@ -186,7 +186,7 @@ function AuctionBuyScan:CreateBottomUIFrameForBrowse()
 			:SetSize(107, 24)
 			:SetMargin(0, 8, 0, 0)
 			:SetText(L["Post"])
-			:SetDisabledPublisher(self._state:PublisherForExpression([[not canPost or pendingFuture ~= nil or not canSendAuctionQuery]]))
+			:SetDisabledPublisher(self._state:PublisherForExpression([[not canPost or pendingFuture ~= nil]]))
 			:SetAction("OnClick", "ACTION_POST_AUCTION")
 		)
 		:AddChild(UIElements.New("VerticalLine", "line")
@@ -1363,6 +1363,9 @@ function AuctionBuyScan.__private:_ActionHandler(manager, state, action, ...)
 		local result = ...
 		if result then
 			AuctionHouseWrapper.AutoQueryOwnedAuctions()
+			BagTracking.RescanAllBags()
+			local postContext = self:_GetPostContext()
+			state.selectionCanPost = postContext and postContext:CanPost() or false
 		else
 			ChatMessage.PrintUser(L["Failed to post auction due to the auction house being busy. Ensure no other addons are scanning the AH and try again."])
 		end
