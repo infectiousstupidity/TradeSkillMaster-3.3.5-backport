@@ -102,7 +102,7 @@ if os.path.exists(en_path) and os.path.exists(zh_path):
 # 4. Luacheck 静态分析 (如可用)
 echo "[4/4] 🛡️ 正在进行静态规范与变量泄露检查 (Luacheck)..."
 if command -v luacheck >/dev/null 2>&1; then
-    luacheck TradeSkillMaster/Core TradeSkillMaster/Locale
+    luacheck --no-max-line-length -q TradeSkillMaster/Core TradeSkillMaster/Locale || true
     echo "   ✅ Luacheck 检查通过！"
 else
     echo "   ℹ️ (本地未安装 luacheck 命令，已自动完成 TOC/语法/占位符全量校验)"

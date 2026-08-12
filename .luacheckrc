@@ -16,3 +16,5 @@ exclude_files = {
    "TradeSkillMaster/Compat/**",
    "TradeSkillMaster/External/**"
 }
+
+max_line_length = false

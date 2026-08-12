@@ -371,16 +371,20 @@ function Item.IsUsable(link)
 		if not text or text == "" then
 			return false
 		end
-		-- 3.3.5 recipe fix: background tooltips render profession requirement lines
-		-- (e.g. "需要 烹饪", "Requires Cooking") in red when trade skill window is closed.
-		-- Do not treat profession skill requirements on recipes as unusable if player level is met.
-		if text:find("需要", 1, true) or text:find("Requires", 1, true) then
-			local reqLevel = text:match("%d+")
-			reqLevel = reqLevel and tonumber(reqLevel)
+		-- 3.3.5 recipe fix: background tooltips render profession skill requirements
+		-- (e.g. "需要 烹饪 (150)", "Requires Tailoring (375)") in red when trade skill window is closed.
+		-- Matching raw %d extracted 150/375, compared 150 <= playerLevel (80), which evaluated false
+		-- and incorrectly flagged almost all high-level recipes as unusable!
+		-- Properly distinguish character level requirements ("需要等级 70") from profession skill lines.
+		local charReqLevel = text:match("需要等级%s*(%d+)") or text:match("Requires Level%s*(%d+)")
+		if charReqLevel then
 			local playerLevel = UnitLevel and UnitLevel("player") or 80
-			if not reqLevel or reqLevel <= playerLevel then
-				return false
-			end
+			return tonumber(charReqLevel) > playerLevel
+		end
+		if text:find("需要", 1, true) or text:find("Requires", 1, true) then
+			-- Profession requirement or generic requirement line: do not fail usable check
+			-- solely because profession skill number (e.g. 150/375) > 80.
+			return false
 		end
 		local r, g, b = textObj:GetTextColor()
 		-- The client colors unmet requirements red (RED_FONT_COLOR = 1.0, 0.1, 0.1)

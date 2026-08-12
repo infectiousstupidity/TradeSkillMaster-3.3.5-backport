@@ -297,8 +297,8 @@ function private.InitializeParts()
 		return
 	end
 	private.parts = {
-		ItemFilterPart.NewKeyMatch("usable"),
-		ItemFilterPart.NewKeyMatch("exact"),
+		ItemFilterPart.NewKeyMatch("usable", "可用"),
+		ItemFilterPart.NewKeyMatch("exact", "精准", "精确"),
 		ItemFilterPart.NewKeyMatch("crafting", "disenchant"),
 		ItemFilterPart.NewKeyMatch("disenchant", "crafting"),
 		ItemFilterPart.NewNumberMatch("maxQuantity", nil, "^x(%d+)$"),
