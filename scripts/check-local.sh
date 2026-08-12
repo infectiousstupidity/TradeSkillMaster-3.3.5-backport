@@ -42,7 +42,9 @@ echo "[2/4] ⚡ 正在进行 luac -p 语法深度解析..."
 python3 -c "
 import os, subprocess
 lua_files = []
-for root, _, files in os.walk('TradeSkillMaster'):
+for root, _, files in os.walk('.'):
+    if 'EmbeddedLibs' in root or '.git' in root or '.gemini' in root:
+        continue
     for f in files:
         if f.endswith('.lua'):
             lua_files.append(os.path.join(root, f))
@@ -77,8 +79,8 @@ def parse_keys(filepath):
                 keys[m.group(1)] = (m.group(2), line_num)
     return keys
 
-en_path = 'TradeSkillMaster/Locale/enUS.lua'
-zh_path = 'TradeSkillMaster/Locale/zhCN.lua'
+en_path = 'LibTSMUI/Source/Locale/enUS.lua'
+zh_path = 'LibTSMUI/Source/Locale/zhCN.lua'
 
 if os.path.exists(en_path) and os.path.exists(zh_path):
     en_dict = parse_keys(en_path)
@@ -99,10 +101,10 @@ if os.path.exists(en_path) and os.path.exists(zh_path):
     print(f'   ✅ 全量 {len(zh_dict)} 条汉化文本占位符格式校验通过！')
 "
 
-# 4. Luacheck 静态分析 (如可用)
+# 4. Luacheck 检查
 echo "[4/4] 🛡️ 正在进行静态规范与变量泄露检查 (Luacheck)..."
 if command -v luacheck >/dev/null 2>&1; then
-    luacheck --no-max-line-length -q TradeSkillMaster/Core TradeSkillMaster/Locale || true
+    luacheck LibTSM* TradeSkillMaster --config .luacheckrc || true
     echo "   ✅ Luacheck 检查通过！"
 else
     echo "   ℹ️ (本地未安装 luacheck 命令，已自动完成 TOC/语法/占位符全量校验)"
