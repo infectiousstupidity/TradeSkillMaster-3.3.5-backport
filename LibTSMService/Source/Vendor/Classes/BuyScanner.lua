@@ -17,7 +17,6 @@ local Merchant = LibTSMService:From("LibTSMWoW"):Include("API.Merchant")
 local DelayTimer = LibTSMService:From("LibTSMWoW"):IncludeClassType("DelayTimer")
 local Event = LibTSMService:From("LibTSMWoW"):Include("Service.Event")
 local DefaultUI = LibTSMService:From("LibTSMWoW"):Include("UI.DefaultUI")
-local ItemInfo = LibTSMService:Include("Item.ItemInfo")
 local private = {
 	db = nil,
 	updateTimer = nil,
@@ -180,6 +179,7 @@ function private.MerchantUpdateEventHandler()
 end
 
 function private.UpdateMerchantDB()
+	local ItemInfo = LibTSMService:Include("Item.ItemInfo")
 	local needsRetry = false
 	private.db:TruncateAndBulkInsertStart()
 	for i = 1, Merchant.GetNumItems() do
