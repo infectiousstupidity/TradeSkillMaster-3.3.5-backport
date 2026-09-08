@@ -407,6 +407,24 @@ function AuctionSubRow:EqualsIndex(index, noSeller)
 	end
 
 	if TSMDBG then TSMDBG.Log("SubRow", "  SUCCESS: auction matched!") end
+	-- 3.3.5 bid update: sync live bid info from the matched AH lot so retrying a bid
+	-- uses the fresh currentBid + minIncrement instead of repeating the stale lower bid.
+	if bid and bid > 0 then
+		self._currentBid = bid
+	end
+	if minBid and minBid > 0 then
+		self._minBid = minBid
+	end
+	if minIncrement and minIncrement > 0 then
+		self._minIncrement = minIncrement
+	end
+	if isHighBidder ~= nil then
+		self._isHighBidder = isHighBidder and true or false
+	end
+	if seller and seller ~= "?" and (not self._ownerStr or self._ownerStr == "?") then
+		self._ownerStr = seller
+		self._hasOwners = true
+	end
 	return true
 end
 
