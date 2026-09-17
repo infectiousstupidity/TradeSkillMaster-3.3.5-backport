@@ -41,6 +41,7 @@
     <Script file="Source\Profession\Classes\State.lua" />
     <Script file="Source\Profession\Classes\Quality.lua" />
     <Script file="Source\Profession\Classes\Scanner.lua" />
+    <Script file="Source\Profession\Classes\WrathVellum.lua" />
     <Script file="Source\Profession\Classes\CategoryCache.lua" />
     <Script file="Source\Profession\Profession.lua" />
 
