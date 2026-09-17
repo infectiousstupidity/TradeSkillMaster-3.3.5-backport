@@ -393,7 +393,22 @@ end
 ---@param craftString string The craft string
 ---@return string
 function Scanner.GetVellumItemString(craftString)
-	return EnchantData.VellumItemString
+	if not ClientInfo.IsWrathClassic() then
+		return EnchantData.VellumItemString
+	end
+
+	local spellId = CraftString.GetSpellId(craftString)
+	if not ClientInfo.HasFeature(ClientInfo.FEATURES.C_TRADE_SKILL_UI) then
+		local classicSpellId = Scanner.GetClassicSpellId(spellId)
+		local _, indirectSpellId = TradeSkill.GetResult(classicSpellId)
+		spellId = indirectSpellId or spellId
+	end
+	local vellumItemId = EnchantData.WrathVellumItemIds[spellId]
+	if not vellumItemId then
+		Log.Warn("No WotLK vellum mapping for enchant (%s, spell=%s)", tostring(craftString), tostring(spellId))
+		return EnchantData.VellumItemString
+	end
+	return "i:"..vellumItemId
 end
 
 ---Gets the number of result items for a craft.
