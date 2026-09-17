@@ -104,6 +104,21 @@ function private.ScanRecipe(professionName, craftString)
 		end
 		private.matQuantitiesTemp[matString] = quantity
 	end
+
+	-- A vellum is the target of an enchant, not a reagent returned by the
+	-- TradeSkill API, so keep it out of the core profession material DB. TSM's
+	-- Crafting module treats an enchant recipe as producing the sellable scroll,
+	-- though, and that scroll consumes one vellum. Add the canonical WotLK vellum
+	-- here so normal MatPrice, crafting cost, restock, and gathering logic all see
+	-- the real cost without making direct item enchanting require a vellum.
+	if ClientInfo.IsWrathClassic() and Profession.IsEnchant(craftString) then
+		local vellumItemString = Profession.GetVellumItemString(craftString)
+		if vellumItemString then
+			private.settings.mats[vellumItemString] = private.settings.mats[vellumItemString] or {}
+			private.matQuantitiesTemp[vellumItemString] = 1
+		end
+	end
+
 	if next(private.matQuantitiesTemp) then
 		TSM.Crafting.SetMats(craftString, private.matQuantitiesTemp)
 	end
