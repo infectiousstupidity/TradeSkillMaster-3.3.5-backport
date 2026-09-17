@@ -8,6 +8,9 @@ local LibTSMService = select(2, ...).LibTSMService
 local Data = LibTSMService:Init("Profession.Data")
 local EnchantData = LibTSMService:From("LibTSMData"):Include("Enchant")
 local SalvageData = LibTSMService:From("LibTSMData"):Include("Salvage")
+local WOTLK_ENCHANT_RESULTS = {
+	[13794] = "i:38826", -- Enchant Cloak - Resistance
+}
 
 
 
@@ -19,5 +22,5 @@ local SalvageData = LibTSMService:From("LibTSMData"):Include("Salvage")
 ---@param spellId number The recipe spell ID
 ---@return string|string[]|nil
 function Data.GetIndirectCraftResult(spellId)
-	return EnchantData.Recipes[spellId] or SalvageData.MassMill[spellId] or EnchantData.QualityRecipes[spellId] or nil
+	return EnchantData.Recipes[spellId] or WOTLK_ENCHANT_RESULTS[spellId] or SalvageData.MassMill[spellId] or EnchantData.QualityRecipes[spellId] or nil
 end
