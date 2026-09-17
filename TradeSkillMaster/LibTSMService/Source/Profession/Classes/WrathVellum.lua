@@ -11,17 +11,18 @@ local TradeSkill = LibTSMService:From("LibTSMWoW"):Include("API.TradeSkill")
 local ClientInfo = LibTSMService:From("LibTSMWoW"):Include("Util.ClientInfo")
 local Log = LibTSMService:From("LibTSMUtil"):Include("Util.Log")
 
--- WotLK has six distinct vellums. The required vellum depends on both whether the
--- enchant targets armor or a weapon and on the enchant's item-level restriction.
--- This table is based on TSM's historical WotLK vellum data. It intentionally maps
--- each enchant to its canonical minimum vellum tier rather than guessing from names,
--- tooltips, or skill level. Higher-tier vellums can substitute in-game, but using a
--- canonical tier keeps TSM's material cost, gathering list, and actual craft target
--- consistent with one another.
+-- WotLK has six distinct vellums. Keep this compatibility data isolated from
+-- LibTSMData's generated enchant tables so regenerating those tables cannot wipe
+-- the 3.3.5-specific mapping. Each stock WotLK enchant maps to the canonical
+-- minimum vellum TSM historically used for that recipe. Higher tiers can work as
+-- substitutes in-game, but choosing a single canonical target keeps the vellum
+-- TSM prices, gathers, and actually consumes consistent with one another.
 --
--- The old 3.3.5 TSM table mapped Blade Ward (64441) and Blood Draining (64579) to
--- Weapon Vellum I. Later TSM data corrected both to Weapon Vellum III, which matches
--- their WotLK level restriction, so those corrected values are used here.
+-- The original 3.3.5 table mapped Blade Ward (64441) and Blood Draining (64579)
+-- to Weapon Vellum I. Later TSM WotLK data corrected both to Weapon Vellum III;
+-- those corrected values are used here. Greater Blasting (44612) and Titanguard
+-- (62257), which are absent from later generated tables, are retained from the
+-- original 3.3.5 mapping.
 local WRATH_VELLUM_ITEM_IDS = {
 	[7418] = 38682,
 	[7420] = 38682,
@@ -306,8 +307,9 @@ function Scanner.GetVellumItemString(craftString)
 
 	local vellumItemId = WRATH_VELLUM_ITEM_IDS[spellId]
 	if not vellumItemId then
-		-- Preserve the old fallback for custom / unknown server recipes rather than
-		-- making crafting error out. Known stock WotLK scroll enchants are mapped.
+		-- Preserve the pre-fix behavior for custom / unknown server recipes rather
+		-- than crashing or making them uncraftable. Known stock WotLK scroll
+		-- enchants are mapped above; unknown recipes are logged for follow-up.
 		Log.Warn("No WotLK vellum mapping for enchant (%s, spell=%s)", tostring(craftString), tostring(spellId))
 		return originalGetVellumItemString(craftString)
 	end
