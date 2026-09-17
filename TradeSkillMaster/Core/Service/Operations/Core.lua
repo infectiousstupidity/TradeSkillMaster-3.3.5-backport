@@ -76,6 +76,9 @@ function Operations.OnInitialize(settingsDB)
 end
 
 function Operations.GetFirstOperationByItem(moduleName, itemString)
+	if not itemString or itemString == "" then
+		return
+	end
 	local groupPath = Group.GetPathByItem(itemString)
 	for _, operationName in GroupOperation.Iterator(groupPath, moduleName) do
 		Operation.UpdateFromRelationships(moduleName, operationName)
