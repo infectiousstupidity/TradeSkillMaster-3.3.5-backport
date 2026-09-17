@@ -329,6 +329,9 @@ end
 -- ============================================================================
 
 function private.FirstOperationVirtualField(itemString)
+	if not itemString or itemString == "" then
+		return ""
+	end
 	return TSM.Operations.GetFirstOperationByItem("Crafting", itemString) or ""
 end
 
