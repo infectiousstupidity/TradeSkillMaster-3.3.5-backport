@@ -312,7 +312,7 @@ function private.CategoryExpanderOnClick(button)
 end
 
 function private.TaskExpanderOnClick(button)
-	local contentFrame = button:GetParentElement():GetParentElement()
+	local contentFrame = button:GetParentElement():GetParentElement():GetParentElement()
 	local taskText = button:GetContext()
 	private.taskCollapsed[taskText] = not private.taskCollapsed[taskText]
 	if private.taskCollapsed[taskText] then
