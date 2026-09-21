@@ -31,6 +31,8 @@ local UPDATE_TIME_KEYS = {
 	AUCTIONDB_REGION_HISTORICAL = true,
 	AUCTIONDB_REGION_SALE = true,
 }
+local ADAPTIVE_RECENT_MIN_MARKET = 0.60
+local ADAPTIVE_RECENT_MAX_MARKET = 1.25
 
 -- Fields populated locally on 3.3.5 (no App). Browse scans feed these via
 -- AuctionDB.RecordLocalScanResults so DBMinBuyout / DBMarket etc resolve
@@ -145,6 +147,7 @@ function AuctionDB.OnEnable()
 	end
 
 	CustomString.InvalidateCache("DBMarket")
+	CustomString.InvalidateCache("DBAdaptive")
 	CustomString.InvalidateCache("DBMinBuyout")
 	CustomString.InvalidateCache("DBHistorical")
 	CustomString.InvalidateCache("DBRecent")
@@ -232,6 +235,31 @@ function AuctionDB.GetRegionItemData(itemString, key)
 	return result
 end
 
+---Returns a bounded current-market value for thin / volatile local economies.
+---DBRecent reacts immediately to the latest scan while DBMarket is deliberately
+---smoothed. Clamp the recent value around DBMarket so operations can react to
+---real moves without trusting a single sparse or manipulated scan outright.
+---@param itemString string
+---@return number?
+function AuctionDB.GetAdaptiveMarketValue(itemString)
+	local marketValue = AuctionDB.GetRealmItemData(itemString, "marketValue")
+	local recentValue = AuctionDB.GetRealmItemData(itemString, "marketValueRecent")
+	if not marketValue then
+		return recentValue
+	elseif not recentValue then
+		return marketValue
+	end
+
+	local minValue = math.floor(marketValue * ADAPTIVE_RECENT_MIN_MARKET)
+	local maxValue = math.floor(marketValue * ADAPTIVE_RECENT_MAX_MARKET)
+	if recentValue < minValue then
+		return minValue
+	elseif recentValue > maxValue then
+		return maxValue
+	end
+	return recentValue
+end
+
 ---Записывает результаты локального browse-скана для использования как fallback
 ---когда AppHelper не отдал AuctionDB данные (3.3.5 без TSM Desktop App).
 ---Совместим с двумя форматами входа:
@@ -272,6 +300,7 @@ function AuctionDB.RecordLocalScanResults(results)
 		-- сразу после поиска/скана, без /reload.
 		private.localScanTime = time()
 		CustomString.InvalidateCache("DBMarket")
+		CustomString.InvalidateCache("DBAdaptive")
 		CustomString.InvalidateCache("DBMinBuyout")
 		CustomString.InvalidateCache("DBRecent")
 		CustomString.InvalidateCache("DBHistorical")
