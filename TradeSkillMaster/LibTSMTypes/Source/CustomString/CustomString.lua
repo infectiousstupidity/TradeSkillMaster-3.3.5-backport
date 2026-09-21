@@ -86,6 +86,15 @@ end
 function CustomString.InvalidateCache(source, itemString)
 	Sources.InvalidateCache(source, itemString)
 	Object.InvalidateCache(source)
+
+	-- convert(customsource) caches the converted result under the custom source
+	-- key. A custom source may depend on any registered source (for example,
+	-- DBRecent / DBMarket), so invalidate custom-source conversion caches when a
+	-- dependency changes as well. Invalidation is infrequent and the number of
+	-- custom sources is small, so clearing these caches is deliberately simple.
+	for customSource in Sources.CustomIterator() do
+		Object.InvalidateCache(customSource)
+	end
 end
 
 ---Validates the sources used by a custom string object.
