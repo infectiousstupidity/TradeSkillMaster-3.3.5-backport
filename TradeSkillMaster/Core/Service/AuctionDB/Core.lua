@@ -250,8 +250,8 @@ function AuctionDB.GetAdaptiveMarketValue(itemString)
 		return marketValue
 	end
 
-	local minValue = floor(marketValue * ADAPTIVE_RECENT_MIN_MARKET)
-	local maxValue = floor(marketValue * ADAPTIVE_RECENT_MAX_MARKET)
+	local minValue = math.floor(marketValue * ADAPTIVE_RECENT_MIN_MARKET)
+	local maxValue = math.floor(marketValue * ADAPTIVE_RECENT_MAX_MARKET)
 	if recentValue < minValue then
 		return minValue
 	elseif recentValue > maxValue then
