@@ -224,7 +224,8 @@ function Sources.ValidateObject(obj)
 	if (private.objectValidated[obj] or 0) < private.lastRegisteredSourceChange then
 		for _, source, convertArg in obj:DependantSourceIterator() do
 			if source == "convert" then
-				if select(4, Sources.GetInfo(convertArg)) ~= Types.SOURCE_TYPE.PRICE_DB then
+				local sourceType = select(4, Sources.GetInfo(convertArg))
+				if sourceType ~= Types.SOURCE_TYPE.PRICE_DB and not Sources.IsCustomRegistered(convertArg) then
 					return Types.ERROR.INVALID_CONVERT_ARG, convertArg
 				end
 			elseif not Sources.IsRegistered(source) and not Sources.IsCustomRegistered(source) then
