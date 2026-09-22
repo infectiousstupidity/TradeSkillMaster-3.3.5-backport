@@ -145,9 +145,9 @@ local function ComputeWeightedMarket(record, today)
 	if weightTotal > 0 then
 		return math.floor(weightedSum / weightTotal + 0.5), hasV4
 	end
-	if legacyMkt and legacyMkt > 0 then
-		return legacyMkt, false
-	end
+	-- No accepted snapshots remain inside the 15-day window. A migrated legacy
+	-- baseline only participates during its explicit migration grace period above;
+	-- never carry an expired market value forward forever.
 	return nil, false
 end
 
@@ -188,9 +188,8 @@ local function ComputeHistorical(record, today)
 	if count > 0 then
 		return math.floor(sum / count + 0.5)
 	end
-	if legacyHist and legacyHist > 0 then
-		return legacyHist
-	end
+	-- As with DBMarket, the legacy baseline is only valid during the bounded
+	-- migration grace period above. Once the 60-day window is empty, expire it.
 	return nil
 end
 
@@ -272,13 +271,14 @@ end
 local function RecomputeAggregates(record, today)
 	local mkt = ComputeWeightedMarket(record, today)
 	if mkt and mkt > 0 then
-		record.mkt = mkt
 		StoreDailyMarket(record, today, mkt)
 	end
 	local hist = ComputeHistorical(record, today)
-	if hist and hist > 0 then
-		record.hist = hist
-	end
+	-- Persist the recomputed truth, including nil when a rolling window has
+	-- genuinely expired. Leaving the old value in-place would resurrect stale
+	-- data the next time this item is scanned.
+	record.mkt = mkt
+	record.hist = hist
 	record.mktDays = CountRingDays(record.snaps, today - (MARKET_WINDOW - 1))
 	record.histDays = CountRingDays(record.mktRing, today - (HIST_WINDOW - 1))
 	return mkt, hist
