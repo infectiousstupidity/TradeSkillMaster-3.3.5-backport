@@ -90,6 +90,40 @@ function DestroyingScrollTable:GetSelection()
 	return self._selectionItemString, self._selectionSlotId
 end
 
+---Gets the item which would be destroyed after the current selection. If the
+---current stack contains multiple casts, the next cast is the same item.
+---@return string? itemString
+function DestroyingScrollTable:GetNextItemString()
+	local dataIndex = self._selectionSlotId and Table.KeyByValue(self._data.slotId, self._selectionSlotId) or nil
+	if not dataIndex then
+		return nil
+	end
+	local row = self._query:GetNthResult(dataIndex)
+	local itemString, quantity, minQuantity = row:GetFields("itemString", "quantity", "minQuantity")
+	if quantity >= minQuantity * 2 then
+		return itemString
+	end
+	local nextIndex = dataIndex + 1
+	return nextIndex <= #self._data.slotId and self._query:GetNthResult(nextIndex):GetField("itemString") or nil
+end
+
+---Moves the selection to the next queue row without ignoring the current item.
+---Wrap around so repeatedly skipping can cycle through the queue.
+---@return DestroyingScrollTable
+function DestroyingScrollTable:SelectNextItem()
+	local numRows = #self._data.slotId
+	if numRows <= 1 then
+		return self
+	end
+	local dataIndex = self._selectionSlotId and Table.KeyByValue(self._data.slotId, self._selectionSlotId) or nil
+	local nextIndex = (dataIndex or 0) + 1
+	if nextIndex > numRows then
+		nextIndex = 1
+	end
+	self:_SetSelectedSlot(self._data.slotId[nextIndex])
+	return self
+end
+
 
 
 -- ============================================================================
@@ -182,7 +216,7 @@ function DestroyingScrollTable.__protected:_HandleRowClick(row, mouseButton)
 end
 
 function DestroyingScrollTable.__private:_GetActionIconTooltip()
-	return L["Click to hide this item for the current session. Hold shift to hide this item permanently."]
+	return L["Click to skip this item for the current session. Hold shift to permanently mark it as don't destroy."]
 end
 
 function DestroyingScrollTable.__private:_HandleActionIconClick(mouseButton, dataIndex)
