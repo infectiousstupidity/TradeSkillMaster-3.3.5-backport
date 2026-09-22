@@ -364,12 +364,6 @@ function private.ScanThread(auctionScan, scanContext)
 	-- run the scan
 	auctionScan:AddItemListQueriesThreaded(private.itemList)
 	for _, query in auctionScan:QueryIterator() do
-		-- 3.3.5: the posting early-exit predicate is only safe when browse results
-		-- arrive cheapest-first. The generic classic browse sort is
-		-- seller/quantity/unitprice, so a higher-priced listing can be seen first
-		-- and QueryIsBrowseDoneFunction can stop before a cheaper competitor on a
-		-- later page. Force ascending unit-price order before allowing early exit.
-		query:SetUsePriceSort(true)
 		query:SetIsBrowseDoneFunction(private.QueryIsBrowseDoneFunction)
 		query:AddCustomFilter(private.QueryBuyoutFilter)
 	end
