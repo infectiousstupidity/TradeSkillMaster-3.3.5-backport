@@ -264,18 +264,13 @@ function TSM.OnInitialize(settingsDB)
 	-- AuctionDB sources
 	local function GetAuctionDBPriceFunc(key, isRegion)
 		return function(itemString)
-			local value
 			if isRegion then
-				value = TSM.AuctionDB.GetRegionItemData(itemString, key)
-			else
-				value = TSM.AuctionDB.GetRealmItemData(itemString, key)
+				-- 3.3.5 has no trustworthy region-wide dataset without an external
+				-- provider. Keep region sources empty rather than relabeling realm-local
+				-- prices as regional statistics.
+				return TSM.AuctionDB.GetRegionItemData(itemString, key)
 			end
-			-- 3.3.5: region-данных нет (нет TSM App) — DBRegionMarketAvg отвечает
-			-- локальным marketValue, чтобы дефолтные операции не ломались
-			if not value and key == "regionMarketValue" then
-				value = TSM.AuctionDB.GetRealmItemData(itemString, "marketValue")
-			end
-			return value
+			return TSM.AuctionDB.GetRealmItemData(itemString, key)
 		end
 	end
 	CustomString.RegisterSource("AuctionDB", "DBMarket", L["AuctionDB - Market Value"], GetAuctionDBPriceFunc("marketValue"), CustomString.SOURCE_TYPE.PRICE_DB)
