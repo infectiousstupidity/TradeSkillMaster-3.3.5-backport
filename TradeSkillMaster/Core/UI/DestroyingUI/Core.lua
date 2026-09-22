@@ -400,7 +400,7 @@ function private.UpdateQueueDisplay(state)
 		:SetText(format("%d / %d processed", private.queueProcessedCasts, total))
 	local nextItemString = state.frame:GetElement("content.items"):GetNextItemString()
 	queueFrame:GetElement("next")
-		:SetText(nextItemString and ("Next: "..(UIUtils.GetDisplayItemName(nextItemString) or ItemInfo.GetName(nextItemString) or "?")) or "Next: —")
+		:SetText(nextItemString and ("Next: "..(UIUtils.GetDisplayItemName(nextItemString) or ItemInfo.GetName(nextItemString) or "?")) or "Next: -")
 	queueFrame:Draw()
 end
 
