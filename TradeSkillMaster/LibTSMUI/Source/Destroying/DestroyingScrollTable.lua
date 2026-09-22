@@ -216,7 +216,7 @@ function DestroyingScrollTable.__protected:_HandleRowClick(row, mouseButton)
 end
 
 function DestroyingScrollTable.__private:_GetActionIconTooltip()
-	return L["Click to skip this item for the current session. Hold shift to permanently mark it as don't destroy."]
+	return L["Click to ignore this item for the current session. Hold shift to permanently mark it as don't destroy."]
 end
 
 function DestroyingScrollTable.__private:_HandleActionIconClick(mouseButton, dataIndex)

@@ -231,6 +231,7 @@ function Destroying.IgnoreItemSession(itemString)
 			:SetField("ignorePermanent", false)
 			:Create()
 	end
+	private.UpdateBagDB()
 end
 
 function Destroying.IgnoreItemPermanent(itemString)
@@ -250,6 +251,7 @@ function Destroying.IgnoreItemPermanent(itemString)
 			:SetField("ignorePermanent", true)
 			:Create()
 	end
+	private.UpdateBagDB()
 end
 
 function Destroying.ForgetIgnoreItemPermanent(itemString)
@@ -265,6 +267,7 @@ function Destroying.ForgetIgnoreItemPermanent(itemString)
 		private.ignoreDB:DeleteRow(row)
 	end
 	row:Release()
+	private.UpdateBagDB()
 end
 
 function Destroying.CreateIgnoreQuery()
