@@ -162,11 +162,13 @@ function private.PopulateLineWithTrend(tooltip, itemString, info)
 end
 
 function private.PopulateRightText(tooltip, itemString)
-	local lastScan, numAuctions = nil, nil
+	local lastScan, numAuctions, scanSamples, marketDays = nil, nil, nil, nil
 	if itemString == ItemString.GetPlaceholder() then
 		-- example tooltip
 		lastScan = time() - 120
 		numAuctions = 5
+		scanSamples = 5
+		marketDays = 4
 	else
 		-- 3.3.5: предпочитаем per-item время скана (index 6 в holder, ключ
 		-- "lastScan") — показывает когда именно ЭТОТ предмет был последний раз
@@ -180,11 +182,22 @@ function private.PopulateRightText(tooltip, itemString)
 			end
 		end
 		numAuctions = TSM.AuctionDB.GetRealmItemData(itemString, "numAuctions") or 0
+		scanSamples = TSM.AuctionDB.GetRealmItemData(itemString, "scanSamples")
+		marketDays = TSM.AuctionDB.GetRealmItemData(itemString, "marketDays")
 	end
 	if lastScan > 0 then
 		local timeColor = (time() - lastScan) > DATA_OLD_THRESHOLD_SECONDS and Theme.GetColor("FEEDBACK_RED") or Theme.GetColor("FEEDBACK_GREEN")
 		local timeDiff = SecondsToTime(time() - lastScan)
-		return tooltip:ApplyValueColor(format(L["%d auctions"], numAuctions)).." ("..timeColor:ColorText(format(L["%s ago"], timeDiff))..")"
+		local dataText = format(L["%d auctions"], numAuctions)
+		if scanSamples then
+			dataText = dataText.." · "..format("%d priced", scanSamples)
+		end
+		if marketDays and marketDays > 0 then
+			dataText = dataText.." · "..format("%dd history", marketDays)
+		elseif scanSamples and scanSamples > 0 then
+			dataText = dataText.." · "..L["building history"]
+		end
+		return tooltip:ApplyValueColor(dataText).." ("..timeColor:ColorText(format(L["%s ago"], timeDiff))..")"
 	else
 		return tooltip:ApplyValueColor(L["Not Scanned"])
 	end
