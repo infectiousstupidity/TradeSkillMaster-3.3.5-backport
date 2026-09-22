@@ -15,6 +15,7 @@ local ItemString = TSM.LibTSMTypes:Include("Item.ItemString")
 local Threading = TSM.LibTSMTypes:Include("Threading")
 local CustomString = TSM.LibTSMTypes:Include("CustomString")
 local AppHelper = TSM.LibTSMApp:Include("Service.AppHelper")
+local DelayTimer = TSM.LibTSMWoW:IncludeClassType("DelayTimer")
 local private = {
 	realmData = {},
 	realmUpdateTime = nil,
@@ -23,6 +24,7 @@ local private = {
 	altRealmData = {},
 	lastScanTemp = {},
 	localScanTime = 0,
+	freshnessTimer = nil,
 }
 local UPDATE_TIME_KEYS = {
 	AUCTIONDB_NON_COMMODITY_DATA = true,
@@ -36,6 +38,7 @@ local ADAPTIVE_RECENT_MAX_MARKET = 1.25
 local LOCAL_RECENT_MAX_AGE = 12 * 60 * 60
 local LOCAL_MARKET_MAX_AGE = 15 * 24 * 60 * 60
 local LOCAL_HISTORICAL_MAX_AGE = 60 * 24 * 60 * 60
+local FRESHNESS_CACHE_INVALIDATION_INTERVAL = 60 * 60
 local LOCAL_FIELD_MAX_AGE = {
 	minBuyout = LOCAL_RECENT_MAX_AGE,
 	marketValueRecent = LOCAL_RECENT_MAX_AGE,
@@ -49,7 +52,7 @@ local LOCAL_FIELD_MAX_AGE = {
 -- the shared holder's data tuple.
 -- ВАЖНО: имена здесь — ключи, которые читают источники в TradeSkillMaster.lua:
 --   DBMarket → "marketValue", DBRecent → "marketValueRecent", DBHistorical → "historical".
--- Позиция в массиве holder'а фиксирована ({mb, mv, na, mkt, hist, ts}),
+-- Позиция в массиве holder'а фиксирована ({mb, mv, na, mkt, hist, ts, ns, mktDays, histDays}),
 -- поэтому index 2 (сырой snapshot mv) обязан называться marketValueRecent,
 -- а index 4 (EMA mkt) — marketValue. Иначе dbmarket/dbrecent меняются местами.
 private.LOCAL_FIELDS = {
@@ -84,6 +87,9 @@ end
 -- ============================================================================
 
 function AuctionDB.OnEnable()
+	private.freshnessTimer = private.freshnessTimer or DelayTimer.New("AUCTIONDB_LOCAL_FRESHNESS", private.FreshnessTimerHandler)
+	private.freshnessTimer:RunForTime(FRESHNESS_CACHE_INVALIDATION_INTERVAL)
+
 	-- 3.3.5: expose the in-memory scan recorder so the Scanner (LibTSMService
 	-- layer) can refresh DBMinBuyout / DBMarket live after each browse scan,
 	-- not just persist to the TradeSkillMaster_AuctionDB SavedVariable. Without
@@ -342,6 +348,19 @@ end
 -- ============================================================================
 -- Private Helper Functions
 -- ============================================================================
+
+function private.FreshnessTimerHandler()
+	-- PRICE_DB sources cache values indefinitely until invalidated. These local
+	-- sources have age-based validity, so periodically clear their caches to make
+	-- 12h / 15d / 60d expirations take effect during a long-running session.
+	CustomString.InvalidateCache("DBMarket")
+	CustomString.InvalidateCache("DBAdaptive")
+	CustomString.InvalidateCache("DBMinBuyout")
+	CustomString.InvalidateCache("DBRecent")
+	CustomString.InvalidateCache("DBHistorical")
+	CustomString.InvalidateCache("DBRegionMarketAvg")
+	private.freshnessTimer:RunForTime(FRESHNESS_CACHE_INVALIDATION_INTERVAL)
+end
 
 function private.LoadRegionRealmAppData(tbl, appData)
 	local maxUpdateTime = 0
