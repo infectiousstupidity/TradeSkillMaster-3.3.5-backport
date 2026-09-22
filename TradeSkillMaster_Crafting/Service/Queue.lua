@@ -189,6 +189,26 @@ end
 -- Private Helper Functions
 -- ============================================================================
 
+function private.SetRestockNum(itemString, recipeString, numQueued)
+	-- Restocking reconciles this item's queue to the current owned total. Clear
+	-- stale recipe variants first so an older restock can't survive alongside the
+	-- newly-selected cheapest recipe (or survive after we've reached max stock).
+	local staleRecipeStrings = TempTable.Acquire()
+	local query = private.db:NewQuery()
+		:Select("recipeString", "craftString")
+	for _, queuedRecipeString, queuedCraftString in query:Iterator() do
+		if queuedRecipeString ~= recipeString and TSM.Crafting.GetItemString(queuedCraftString) == itemString then
+			tinsert(staleRecipeStrings, queuedRecipeString)
+		end
+	end
+	query:Release()
+	for _, queuedRecipeString in ipairs(staleRecipeStrings) do
+		Queue.SetNum(queuedRecipeString, 0)
+	end
+	TempTable.Release(staleRecipeStrings)
+	Queue.SetNum(recipeString, numQueued)
+end
+
 function private.RestockItem(itemString)
 	assert(not next(private.optionalMatTemp) and not next(private.qualityMatTemp))
 	local cheapestCost, cheapestCraftString, cheapestConcentration = TSM.Crafting.Cost.GetLowestCostByItem(itemString, private.optionalMatTemp, private.qualityMatTemp)
@@ -234,6 +254,7 @@ function private.RestockItem(itemString)
 	haveQuantity = max(haveQuantity, 0)
 	local neededQuantity = CraftingOperation.GetRestockQuantity(itemString, haveQuantity)
 	if neededQuantity == 0 then
+		private.SetRestockNum(itemString, recipeString, 0)
 		return
 	end
 	if CraftString.GetQuality(cheapestCraftString) then
@@ -242,5 +263,5 @@ function private.RestockItem(itemString)
 		wipe(private.qualityMatTemp)
 		wipe(private.matsTemp)
 	end
-	Queue.SetNum(recipeString, floor(neededQuantity / TSM.Crafting.GetNumResult(cheapestCraftString)))
+	private.SetRestockNum(itemString, recipeString, floor(neededQuantity / TSM.Crafting.GetNumResult(cheapestCraftString)))
 end
