@@ -48,6 +48,7 @@ function DestroyingScrollTable:__init()
 	self._query = nil
 	self._selectionItemString = nil
 	self._selectionSlotId = nil
+	self._minQuantity = {}
 end
 
 function DestroyingScrollTable:Acquire()
@@ -59,6 +60,7 @@ function DestroyingScrollTable:Release()
 	self._query = nil
 	self._selectionItemString = nil
 	self._selectionSlotId = nil
+	wipe(self._minQuantity)
 	self.__super:Release()
 end
 
@@ -98,8 +100,12 @@ function DestroyingScrollTable:GetNextItemString()
 	if not dataIndex then
 		return nil
 	end
-	local row = self._query:GetNthResult(dataIndex)
-	local itemString, quantity, minQuantity = row:GetFields("itemString", "quantity", "minQuantity")
+	local itemString = self._data.item_tooltip[dataIndex]
+	local quantity = self._data.num[dataIndex]
+	local minQuantity = self._minQuantity[dataIndex]
+	if not itemString or not quantity or not minQuantity then
+		return nil
+	end
 	if quantity >= minQuantity * 2 then
 		return itemString
 	end
@@ -111,7 +117,7 @@ function DestroyingScrollTable:GetNextItemString()
 	if nextIndex > numRows then
 		nextIndex = 1
 	end
-	return self._query:GetNthResult(nextIndex):GetField("itemString")
+	return self._data.item_tooltip[nextIndex]
 end
 
 ---Moves the selection to the next queue row without ignoring the current item.
@@ -155,7 +161,7 @@ function DestroyingScrollTable.__private:_SetSelectedSlot(slotId)
 		if newRow then
 			newRow:SetSelected(true)
 		end
-		self._selectionItemString = self._query:GetNthResult(dataIndex):GetField("itemString")
+		self._selectionItemString = self._data.item_tooltip[dataIndex]
 		self._selectionSlotId = slotId
 		self:_ScrollToRow(dataIndex)
 	else
@@ -174,14 +180,16 @@ function DestroyingScrollTable.__private:_HandleQueryUpdate()
 	end
 	wipe(self._createGroupsData)
 	wipe(self._actionIcon)
+	wipe(self._minQuantity)
 	local hasExistingSelection, nextSelectionSlotId = false, nil
 	for _, row in self._query:Iterator() do
-		local itemString, quantity, name, slotId = row:GetFields("itemString", "quantity", "name", "slotId")
+		local itemString, quantity, name, slotId, minQuantity = row:GetFields("itemString", "quantity", "name", "slotId", "minQuantity")
 		tinsert(self._data.item, Theme.GetItemIconLink(ItemInfo.GetTexture(itemString) or 0).." "..(UIUtils.GetDisplayItemName(itemString) or "?"))
 		tinsert(self._data.item_tooltip, itemString)
 		tinsert(self._data.num, quantity)
 		tinsert(self._actionIcon, "iconPack.12x12/Hide")
 		tinsert(self._data.slotId, slotId)
+		tinsert(self._minQuantity, minQuantity)
 		if self._selectionItemString then
 			if slotId == self._selectionSlotId and itemString == self._selectionItemString then
 				hasExistingSelection = true
@@ -230,6 +238,8 @@ function DestroyingScrollTable.__private:_HandleActionIconClick(mouseButton, dat
 	if mouseButton ~= "LeftButton" then
 		return
 	end
-	local itemString = self._query:GetNthResult(dataIndex):GetField("itemString")
-	self:_SendActionScript("OnHideIconClick", itemString, IsShiftKeyDown())
+	local itemString = self._data.item_tooltip[dataIndex]
+	if itemString then
+		self:_SendActionScript("OnHideIconClick", itemString, IsShiftKeyDown())
+	end
 end
