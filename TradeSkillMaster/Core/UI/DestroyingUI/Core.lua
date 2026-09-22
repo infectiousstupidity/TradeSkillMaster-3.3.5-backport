@@ -82,16 +82,11 @@ function DestroyingUI.OnEnable(settingsDB)
 	private.manager:SetStateFromPublisher("autoCombine", private.settings:PublisherForKey("autoStack"))
 	private.manager:SetStateFromPublisher("autoShow", private.settings:PublisherForKey("autoShow"))
 
-	-- Auto-show only when there is an actionable, non-ignored destroy target. Partial
-	-- stacks which can merely be combined should not pop the frame by themselves.
-	private.manager:ProcessActionFromPublisher("ACTION_CAN_DESTROY", state:PublisherForExpression([[autoShow and not didAutoShow and canDestroy]])
+	-- Auto-show when there is an actionable, non-ignored destroy target. Preserve
+	-- automatic stack-combining too: if partial stacks can become destroyable and
+	-- auto-combine is enabled, open the frame so that combine can run first.
+	private.manager:ProcessActionFromPublisher("ACTION_CAN_DESTROY", state:PublisherForExpression([[autoShow and not didAutoShow and (canDestroy or (autoCombine and canCombine))]])
 		:IgnoreIfNotEquals(true)
-	)
-
-	-- Re-arm auto-show after the destroy queue becomes empty. Closing the frame while
-	-- work remains intentionally does not immediately reopen it.
-	private.manager:ProcessActionFromPublisher("ACTION_CAN_NOT_DESTROY", state:PublisherForKeyChange("canDestroy")
-		:IgnoreIfNotEquals(false)
 	)
 
 	-- Publisher for when we don't have anything to combine/destroy
@@ -290,11 +285,13 @@ function private.ActionHandler(manager, state, action, ...)
 			ChatMessage.PrintUser(L["There is nothing in your inventory to destroy which matches your settings."])
 		end
 	elseif action == "ACTION_ON_DISABLE" or action == "ACTION_CAN_NOT_COMBINE_OR_DESTROY" then
+		if action == "ACTION_CAN_NOT_COMBINE_OR_DESTROY" then
+			-- The queue is fully empty, so a future eligible item may auto-show again.
+			state.didAutoShow = false
+		end
 		if state.frame then
 			state.frame:Hide()
 		end
-	elseif action == "ACTION_CAN_NOT_DESTROY" then
-		state.didAutoShow = false
 	elseif action == "ACTION_CAN_DESTROY" then
 		if not state.frame then
 			return manager:ProcessAction("ACTION_FRAME_SHOW")
