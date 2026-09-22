@@ -159,7 +159,8 @@ function Schema.Get()
 	-- [132] removed internalData.reagentBankQuantity
 	-- [133] updated global.auctionUIContext.{auctioningAuctionScrollingTable,myAuctionsScrollingTable,shoppingAuctionScrollingTable,sniperScrollingTable}, factionrealm.auctioningOptions.whitelist
 	-- [134] added global.appearanceOptions.{fontFace,fontScale,itemIconSize}
-	return Settings.NewSchema(134, 10)
+	-- [135] changed global.coreOptions.destroyValueSource default to dbminbuyout
+	return Settings.NewSchema(135, 10)
 		:EnterScope("global")
 			:EnterNamespace("debug")
 				:AddBoolean("chatLoggingEnabled", false, 19)
@@ -260,7 +261,7 @@ function Schema.Get()
 				:AddString("chatFrame", "", 10)
 				:AddString("auctionSaleSound", "TSM_NO_SOUND", 10)
 				:AddTable("minimapIcon", { hide = false, minimapPos = 220, radius = 80 }, 10)
-				:AddString("destroyValueSource", "dbmarket", 10)
+				:AddString("destroyValueSource", "dbminbuyout", 135)
 				:AddString("groupPriceSource", "dbmarket", 41)
 				:AddBoolean("regionWide", false, 119)
 			:LeaveNamespace()
