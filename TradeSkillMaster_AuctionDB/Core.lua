@@ -381,7 +381,9 @@ function TSM_AuctionDB_RecordScan(scanData)
 				existing.ns = nsamples
 			end
 			existing.ts = now
-			existing.migDay = existing.migDay or today
+			-- migDay is only for records migrated from the pre-v4 aggregate format.
+			-- New records must not treat their own freshly-computed market value as a
+			-- legacy baseline on subsequent scans (which would double-weight it).
 
 			if type(mv) == "number" and mv > 0 then
 				existing.mv = mv
