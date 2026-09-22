@@ -103,8 +103,15 @@ function DestroyingScrollTable:GetNextItemString()
 	if quantity >= minQuantity * 2 then
 		return itemString
 	end
+	local numRows = #self._data.slotId
+	if numRows <= 1 then
+		return nil
+	end
 	local nextIndex = dataIndex + 1
-	return nextIndex <= #self._data.slotId and self._query:GetNthResult(nextIndex):GetField("itemString") or nil
+	if nextIndex > numRows then
+		nextIndex = 1
+	end
+	return self._query:GetNthResult(nextIndex):GetField("itemString")
 end
 
 ---Moves the selection to the next queue row without ignoring the current item.
