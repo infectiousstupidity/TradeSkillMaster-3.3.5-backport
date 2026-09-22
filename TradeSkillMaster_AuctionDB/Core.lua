@@ -1,7 +1,9 @@
 -- TradeSkillMaster_AuctionDB - Local auction scan database for 3.3.5a
 -- Schema v4: per-item record
 --   mb, mv, na, ts           live scan fields (DBMinBuyout, DBRecent, auction count, lastScan)
+--   ns                        priced-auction sample count from the latest scan
 --   mkt, hist                computed DBMarket / DBHistorical (also legacy baseline during migration)
+--   mktDays, histDays        accepted day coverage for the rolling windows
 --   migDay                   calendar day v4 migration started (legacy influence decays from here)
 --   dSum, dCnt, dDay         running accepted snapshot sum/count for current calendar day
 --   snaps                    compact ring: "day:avg,..." daily snapshot averages (≤15 days)
@@ -69,6 +71,16 @@ local function PruneRing(map, minDay, maxEntries)
 		map[days[1]] = nil
 		table.remove(days, 1)
 	end
+end
+
+local function CountRingDays(str, minDay)
+	local count = 0
+	for day in pairs(ParseRing(str)) do
+		if not minDay or day >= minDay then
+			count = count + 1
+		end
+	end
+	return count
 end
 
 
@@ -267,6 +279,8 @@ local function RecomputeAggregates(record, today)
 	if hist and hist > 0 then
 		record.hist = hist
 	end
+	record.mktDays = CountRingDays(record.snaps, today - (MARKET_WINDOW - 1))
+	record.histDays = CountRingDays(record.mktRing, today - (HIST_WINDOW - 1))
 	return mkt, hist
 end
 
@@ -363,6 +377,9 @@ function TSM_AuctionDB_RecordScan(scanData)
 			if type(na) == "number" and na > 0 then
 				existing.na = na
 			end
+			if type(nsamples) == "number" and nsamples >= 0 then
+				existing.ns = nsamples
+			end
 			existing.ts = now
 			existing.migDay = existing.migDay or today
 
@@ -379,6 +396,12 @@ function TSM_AuctionDB_RecordScan(scanData)
 				end
 			end
 
+			if type(data) == "table" then
+				data.ts = now
+				data.scanSamples = existing.ns
+				data.marketDays = existing.mktDays or 0
+				data.historicalDays = existing.histDays or 0
+			end
 			items[is] = existing
 			recorded = recorded + 1
 		end

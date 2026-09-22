@@ -33,6 +33,15 @@ local UPDATE_TIME_KEYS = {
 }
 local ADAPTIVE_RECENT_MIN_MARKET = 0.60
 local ADAPTIVE_RECENT_MAX_MARKET = 1.25
+local LOCAL_RECENT_MAX_AGE = 12 * 60 * 60
+local LOCAL_MARKET_MAX_AGE = 15 * 24 * 60 * 60
+local LOCAL_HISTORICAL_MAX_AGE = 60 * 24 * 60 * 60
+local LOCAL_FIELD_MAX_AGE = {
+	minBuyout = LOCAL_RECENT_MAX_AGE,
+	marketValueRecent = LOCAL_RECENT_MAX_AGE,
+	marketValue = LOCAL_MARKET_MAX_AGE,
+	historical = LOCAL_HISTORICAL_MAX_AGE,
+}
 
 -- Fields populated locally on 3.3.5 (no App). Browse scans feed these via
 -- AuctionDB.RecordLocalScanResults so DBMinBuyout / DBMarket etc resolve
@@ -49,7 +58,10 @@ private.LOCAL_FIELDS = {
 	"numAuctions",       -- index 3  (na)
 	"marketValue",       -- index 4  (mkt = DBMarket:     15-day weighted daily avg)
 	"historical",        -- index 5  (hist = DBHistorical: 60-day avg of daily DBMarket)
-	"lastScan",          -- index 6  (ts  = время последнего скана per-item для тултипа)
+	"lastScan",          -- index 6  (ts  = per-item latest scan timestamp)
+	"scanSamples",       -- index 7  (priced auctions in the latest scan)
+	"marketDays",        -- index 8  (accepted days represented in DBMarket)
+	"historicalDays",    -- index 9  (days represented in DBHistorical)
 }
 
 -- 3.3.5: один shared multi-field holder для всех LOCAL_FIELDS. Все ключи
@@ -96,21 +108,24 @@ function AuctionDB.OnEnable()
 		local count = 0
 		local maxTs = 0
 		for itemString, record in pairs(localData) do
-			local mb, mv, na, ts, mkt, hist
+			local mb, mv, na, ts, mkt, hist, scanSamples, marketDays, historicalDays
 			if type(record) == "number" then
 				mb = record
 			elseif type(record) == "table" then
-				mb   = record.mb   or record.minBuyout
-				mv   = record.mv   or record.marketValue
-				na   = record.na   or record.numAuctions
-				ts   = record.ts
-				mkt  = record.mkt
-				hist = record.hist
+				mb             = record.mb   or record.minBuyout
+				mv             = record.mv   or record.marketValue
+				na             = record.na   or record.numAuctions
+				ts             = record.ts
+				mkt            = record.mkt
+				hist           = record.hist
+				scanSamples    = record.ns or record.scanSamples
+				marketDays     = record.mktDays or record.marketDays
+				historicalDays = record.histDays or record.historicalDays
 			end
 			if type(mb) == "number" and mb > 0 then
 				local mvVal  = (type(mv)   == "number" and mv   > 0) and mv   or mb
-				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or mvVal
-				local hvVal  = (type(hist) == "number" and hist > 0) and hist or mktVal
+				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or nil
+				local hvVal  = (type(hist) == "number" and hist > 0) and hist or nil
 				private.localHolder.itemLookup[itemString] = {
 					mb,
 					mvVal,
@@ -118,6 +133,9 @@ function AuctionDB.OnEnable()
 					mktVal,
 					hvVal,
 					(type(ts) == "number" and ts > 0) and ts or nil,
+					(type(scanSamples) == "number" and scanSamples >= 0) and scanSamples or nil,
+					(type(marketDays) == "number" and marketDays >= 0) and marketDays or nil,
+					(type(historicalDays) == "number" and historicalDays >= 0) and historicalDays or nil,
 				}
 				count = count + 1
 				if type(ts) == "number" and ts > maxTs then
@@ -244,8 +262,10 @@ end
 function AuctionDB.GetAdaptiveMarketValue(itemString)
 	local marketValue = AuctionDB.GetRealmItemData(itemString, "marketValue")
 	local recentValue = AuctionDB.GetRealmItemData(itemString, "marketValueRecent")
+	-- Adaptive is explicitly a bounded recent value around an established market
+	-- baseline. Never promote an unconfirmed sparse snapshot into a market source.
 	if not marketValue then
-		return recentValue
+		return nil
 	elseif not recentValue then
 		return marketValue
 	end
@@ -274,22 +294,29 @@ function AuctionDB.RecordLocalScanResults(results)
 	for itemString, data in pairs(results) do
 		itemString = ItemString.Get(itemString) or itemString
 		if type(data) == "table" then
-			local mb   = data.mb  or data.minBuyout
-			local mv   = data.mv  or data.marketValue
-			local na   = data.na  or data.numAuctions
-			local mkt  = data.mkt
-			local hist = data.hist
+			local mb             = data.mb  or data.minBuyout
+			local mv             = data.mv  or data.marketValue
+			local na             = data.na  or data.numAuctions
+			local mkt            = data.mkt
+			local hist           = data.hist
+			local ts             = data.ts
+			local scanSamples    = data.scanSamples or data.nsamples
+			local marketDays     = data.marketDays
+			local historicalDays = data.historicalDays
 			if type(mb) == "number" and mb > 0 then
 				local mvVal  = (type(mv)   == "number" and mv   > 0) and mv   or mb
-				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or mvVal
-				local hvVal  = (type(hist) == "number" and hist > 0) and hist or mktVal
+				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or nil
+				local hvVal  = (type(hist) == "number" and hist > 0) and hist or nil
 				private.localHolder.itemLookup[itemString] = {
 					mb,
 					mvVal,
 					(type(na) == "number" and na > 0) and na or 1,
 					mktVal,
 					hvVal,
-					time(),
+					(type(ts) == "number" and ts > 0) and ts or time(),
+					(type(scanSamples) == "number" and scanSamples >= 0) and scanSamples or nil,
+					(type(marketDays) == "number" and marketDays >= 0) and marketDays or nil,
+					(type(historicalDays) == "number" and historicalDays >= 0) and historicalDays or nil,
 				}
 				count = count + 1
 			end
@@ -304,6 +331,9 @@ function AuctionDB.RecordLocalScanResults(results)
 		CustomString.InvalidateCache("DBMinBuyout")
 		CustomString.InvalidateCache("DBRecent")
 		CustomString.InvalidateCache("DBHistorical")
+		CustomString.InvalidateCache("DBScanSamples")
+		CustomString.InvalidateCache("DBMarketDays")
+		CustomString.InvalidateCache("DBHistoricalDays")
 	end
 end
 
@@ -383,6 +413,16 @@ function private.GetItemDataHelper(tbl, key, itemString)
 	end
 	local data = private.UnpackData(tbl, itemString)
 	if not data then return nil end
+	if tbl == private.localHolder then
+		local maxAge = LOCAL_FIELD_MAX_AGE[key]
+		if maxAge then
+			local lastScanIndex = tbl.fieldLookup.lastScan
+			local lastScan = lastScanIndex and data[lastScanIndex] or nil
+			if type(lastScan) ~= "number" or lastScan <= 0 or max(0, time() - lastScan) > maxAge then
+				return nil
+			end
+		end
+	end
 	local value = data[fieldIndex]
 	-- "lastScan" (ts) — это unix timestamp, не цена: не требует value > 0 guard.
 	-- Для остальных полей нулевое или отсутствующее значение = данных нет.
