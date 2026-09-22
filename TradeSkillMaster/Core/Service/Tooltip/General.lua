@@ -189,7 +189,10 @@ function private.GetConversionsValue(itemString)
 			for targetItemString in Conversion.DisenchantTargetItemIterator() do
 				local amountOfMats = Conversions.GetDisenchantTargetItemSourceInfo(targetItemString, classId, quality, itemLevel, nil)
 				if amountOfMats then
-					local matValue = CustomString.GetSourceValue(sourceKey, targetItemString) or 0
+					local matValue = CustomString.GetSourceValue(sourceKey, targetItemString)
+						or CustomString.GetSourceValue("DBMinBuyout", targetItemString)
+						or CustomString.GetSourceValue("DBMarket", targetItemString)
+						or 0
 					value = value + matValue * amountOfMats
 				end
 			end
@@ -204,7 +207,10 @@ function private.GetConversionsValue(itemString)
 	local method = nil
 	for targetItemString, rate, _, _, _, _, _, _, itemMethod in Conversion.TargetItemsByMethodIterator(itemString, nil) do
 		method = method or itemMethod
-		local matValue = CustomString.GetSourceValue(sourceKey, targetItemString) or 0
+		local matValue = CustomString.GetSourceValue(sourceKey, targetItemString)
+			or CustomString.GetSourceValue("DBMinBuyout", targetItemString)
+			or CustomString.GetSourceValue("DBMarket", targetItemString)
+			or 0
 		value = value + matValue * rate
 	end
 	value = floor(value)
@@ -237,12 +243,11 @@ function private.PopulateFullDestroyLines(tooltip, itemString)
 		for targetItemString in Conversion.DisenchantTargetItemIterator() do
 			local amountOfMats, matRate, minAmount, maxAmount = Conversions.GetDisenchantTargetItemSourceInfo(targetItemString, classId, quality, itemLevel, expansion)
 			if amountOfMats then
-				-- 3.3.5a backport: fall back to DBMarket then DBMinBuyout so the full
-				-- destroy breakdown still lists this material when the selected source
-				-- (e.g. Historical Price) has no data for it.
+				-- 3.3.5a: if the selected source is missing, use the fresh current
+				-- min-buyout before the smoothed market estimate.
 				local matValue = CustomString.GetSourceValue(private.settings.destroyValueSource, targetItemString)
-					or CustomString.GetSourceValue("DBMarket", targetItemString)
 					or CustomString.GetSourceValue("DBMinBuyout", targetItemString)
+					or CustomString.GetSourceValue("DBMarket", targetItemString)
 					or 0
 				if matValue > 0 then
 					tooltip:AddSubItemValueLine(targetItemString, matValue, amountOfMats, matRate, minAmount, maxAmount)
@@ -255,8 +260,8 @@ function private.PopulateFullDestroyLines(tooltip, itemString)
 			local matValue = CustomString.GetSourceValue(private.settings.destroyValueSource, targetItemString)
 				or (TSM.Crafting and TSM.Crafting.GetConversionsValue(targetItemString, private.settings.destroyValueSource))
 				or (not TSM.Crafting and private.GetConversionsValue(targetItemString))
-				or CustomString.GetSourceValue("DBMarket", targetItemString)
 				or CustomString.GetSourceValue("DBMinBuyout", targetItemString)
+				or CustomString.GetSourceValue("DBMarket", targetItemString)
 				or 0
 			if matValue > 0 then
 				local quality = sourceQuality and TSM.Crafting and TSM.Crafting.Quality.GetExpectedSalvageResult(method, sourceQuality)

@@ -395,6 +395,16 @@ function private.ProcessUpgrade(db, upgradeObj)
 			end
 		end
 	end
+	if prevVersion < 135 then
+		for _, key, value in upgradeObj:RemovedSettingIterator("global", nil, "coreOptions", "destroyValueSource") do
+			-- v135 changes the old DBMarket default to current DBMinBuyout so destroy / DE
+			-- economics cannot overvalue materials versus a fresh Auction House scan.
+			-- Preserve explicit alternative choices (for example DBHistorical).
+			if value ~= "dbmarket" then
+				db:Set("global", upgradeObj:GetScopeKey(key), "coreOptions", "destroyValueSource", value)
+			end
+		end
+	end
 	-- NOTE: When adding migrations, be careful of multiple migrations modifying the same key, as
 	-- the RemovedSettingIterator value could be stale.
 end
