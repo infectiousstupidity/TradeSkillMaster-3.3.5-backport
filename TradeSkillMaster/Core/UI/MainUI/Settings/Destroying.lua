@@ -15,11 +15,11 @@ local private = {
 local ITEM_QUALITY_DESCS = { ITEM_QUALITY2_DESC, ITEM_QUALITY3_DESC, ITEM_QUALITY4_DESC }
 local ITEM_QUALITY_KEYS = { 2, 3, 4 }
 local SETTING_TOOLTIPS = {
-	autoStack = L["Automtaically combine smaller stacks of herbs and ore as needed for milling and prospecting respectively."],
-	autoShow = L["Automatically show the Destroying UI when you have something in your bags to destroy."],
+	autoStack = L["Automatically combine smaller stacks of herbs and ore as needed for milling and prospecting respectively."],
+	autoShow = L["Automatically show the Destroying UI when a non-ignored item in your bags matches your Destroying settings and can be destroyed."],
 	includeSoulbound = L["Include soulbound items in the list of items to disenchant."],
 	deMaxQuanlity = L["The max quality of item which Destroying will list for disenchanting."],
-	deAbovePrice = L["Destroying will only list items with a disenchant value above this price for disenchanting."],
+	deAbovePrice = L["Destroying will only list items with a disenchant value at or above this price for disenchanting."],
 
 }
 

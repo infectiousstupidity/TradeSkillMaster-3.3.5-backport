@@ -23,8 +23,10 @@ local private = {
 	manager = nil, ---@type UIManager
 	settings = nil, ---@type SettingsView
 	query = nil, ---@type DatabaseQuery
+	queueProcessedCasts = 0,
+	queueRemainingCasts = 0,
 }
-local MIN_FRAME_SIZE = { width = 280, height = 280 }
+local MIN_FRAME_SIZE = { width = 280, height = 340 }
 local CONVERSION_METHODS = {
 	Conversion.METHOD.PROSPECT,
 	Conversion.METHOD.MILL,
@@ -80,15 +82,25 @@ function DestroyingUI.OnEnable(settingsDB)
 	private.manager:SetStateFromPublisher("autoCombine", private.settings:PublisherForKey("autoStack"))
 	private.manager:SetStateFromPublisher("autoShow", private.settings:PublisherForKey("autoShow"))
 
-	-- Publisher for when we have something to combine/destory
-	private.manager:ProcessActionFromPublisher("ACTION_CAN_COMBINE_OR_DESTROY", state:PublisherForExpression([[autoShow and not didAutoShow and canCombineOrDestroy]])
+	-- Auto-show only when there is an actionable, non-ignored destroy target. Partial
+	-- stacks which can merely be combined should not pop the frame by themselves.
+	private.manager:ProcessActionFromPublisher("ACTION_CAN_DESTROY", state:PublisherForExpression([[autoShow and not didAutoShow and canDestroy]])
 		:IgnoreIfNotEquals(true)
 	)
 
-	-- Publisher for when we don't have anything to combine/destory
+	-- Re-arm auto-show after the destroy queue becomes empty. Closing the frame while
+	-- work remains intentionally does not immediately reopen it.
+	private.manager:ProcessActionFromPublisher("ACTION_CAN_NOT_DESTROY", state:PublisherForKeyChange("canDestroy")
+		:IgnoreIfNotEquals(false)
+	)
+
+	-- Publisher for when we don't have anything to combine/destroy
 	private.manager:ProcessActionFromPublisher("ACTION_CAN_NOT_COMBINE_OR_DESTROY", state:PublisherForKeyChange("canCombineOrDestroy")
 		:IgnoreIfNotEquals(false)
 	)
+
+	-- Keep queue counts / current-next display live as bag contents change.
+	private.manager:ProcessActionFromPublisher("ACTION_QUEUE_UPDATED", private.query:Publisher())
 end
 
 function DestroyingUI.OnDisable()
@@ -118,6 +130,26 @@ function private.CreateMainFrame(state)
 		:SetContentFrame(UIElements.New("Frame", "content")
 			:SetLayout("VERTICAL")
 			:SetBackgroundColor("PRIMARY_BG_ALT")
+			:AddChild(UIElements.New("Frame", "queueStatus")
+				:SetLayout("VERTICAL")
+				:SetHeight(62)
+				:SetMargin(8, 8, 8, 0)
+				:AddChild(UIElements.New("Text", "remaining")
+					:SetHeight(18)
+					:SetFont("BODY_BODY2_MEDIUM")
+					:SetJustifyH("LEFT")
+				)
+				:AddChild(UIElements.New("ProgressBar", "progress")
+					:SetHeight(20)
+					:SetMargin(0, 0, 4, 0)
+					:SetProgressIconHidden(true)
+				)
+				:AddChild(UIElements.New("Text", "next")
+					:SetHeight(16)
+					:SetFont("BODY_BODY3")
+					:SetJustifyH("LEFT")
+				)
+			)
 			:AddChild(UIElements.New("Frame", "item")
 				:SetLayout("VERTICAL")
 				:SetHeight(82)
@@ -160,6 +192,24 @@ function private.CreateMainFrame(state)
 				:SetAction("OnHideIconClick", "ACTION_HIDE_ITEM")
 			)
 			:AddChild(UIElements.New("HorizontalLine", "lineBottom"))
+			:AddChild(UIElements.New("Frame", "queueActions")
+				:SetLayout("HORIZONTAL")
+				:SetHeight(26)
+				:SetMargin(12, 12, 8, 0)
+				:AddChild(UIElements.New("ActionButton", "skipBtn")
+					:SetWidth(72)
+					:SetMargin(0, 8, 0, 0)
+					:SetText(L["Skip"])
+					:SetDisabledPublisher(state:PublisherForExpression([[hasActiveFuture or not canDestroy]]))
+					:SetAction("OnClick", "ACTION_SKIP_ITEM")
+				)
+				:AddChild(UIElements.New("ActionButton", "ignoreBtn")
+					:SetText(L["Don't destroy"])
+					:SetTooltip(L["Permanently ignore this item in Destroying. You can undo this in Settings > Destroying > Ignored Items."])
+					:SetDisabledPublisher(state:PublisherForExpression([[hasActiveFuture or not canDestroy]]))
+					:SetAction("OnClick", "ACTION_IGNORE_ITEM_PERMANENT")
+				)
+			)
 			:AddChildIf(not ClientInfo.IsRetail(), UIElements.New("ActionButton", "combineBtn")
 				:SetHeight(26)
 				:SetMargin(12, 12, 12, 0)
@@ -198,10 +248,13 @@ function private.ActionHandler(manager, state, action, ...)
 		assert(not state.frame and state.canCombineOrDestroy)
 		UIUtils.AnalyticsRecordPathChange("destroying")
 		state.didAutoShow = true
+		private.queueProcessedCasts = 0
+		private.queueRemainingCasts = private.GetRemainingCasts()
 		state.frame = private.CreateMainFrame(state)
 		state.frame:Show()
 		state.frame:Draw()
 		manager:ProcessAction("ACTION_ITEM_SELECTION_CHANGED")
+		private.UpdateQueueDisplay(state)
 		if state.autoCombine then
 			-- We should auto-combine first
 			manager:ProcessAction("ACTION_COMBINE_START")
@@ -218,6 +271,8 @@ function private.ActionHandler(manager, state, action, ...)
 		state.frame:Hide()
 		state.frame:Release()
 		state.frame = nil
+		private.queueProcessedCasts = 0
+		private.queueRemainingCasts = 0
 	elseif action == "ACTION_COMBINE_START" then
 		local future = TSM.Destroying.StartCombine()
 		-- Don't care about the result of the future
@@ -238,9 +293,24 @@ function private.ActionHandler(manager, state, action, ...)
 		if state.frame then
 			state.frame:Hide()
 		end
-	elseif action == "ACTION_CAN_COMBINE_OR_DESTROY" then
+	elseif action == "ACTION_CAN_NOT_DESTROY" then
+		state.didAutoShow = false
+	elseif action == "ACTION_CAN_DESTROY" then
 		if not state.frame then
 			return manager:ProcessAction("ACTION_FRAME_SHOW")
+		end
+	elseif action == "ACTION_QUEUE_UPDATED" then
+		if state.frame then
+			private.UpdateQueueProgress(state)
+		end
+	elseif action == "ACTION_SKIP_ITEM" then
+		state.frame:GetElement("content.items"):SelectNextItem()
+		private.UpdateQueueDisplay(state)
+	elseif action == "ACTION_IGNORE_ITEM_PERMANENT" then
+		local itemString = state.frame:GetElement("content.items"):GetSelection()
+		if itemString then
+			ChatMessage.PrintfUser(L["Destroying will ignore %s permanently. You can remove it from the ignored list in the settings."], ItemInfo.GetName(itemString))
+			TSM.Destroying.IgnoreItemPermanent(itemString)
 		end
 	elseif action == "ACTION_ITEM_SELECTION_CHANGED" then
 		local scrollTable = state.frame:GetElement("content.items")
@@ -255,8 +325,9 @@ function private.ActionHandler(manager, state, action, ...)
 			:SetBackground(ItemInfo.GetTexture(itemString))
 			:SetTooltip(itemString)
 		itemFrame:GetElement("header.name")
-			:SetText(UIUtils.GetDisplayItemName(itemString) or "")
+			:SetText(L["Current"]..": "..(UIUtils.GetDisplayItemName(itemString) or ""))
 
+		private.UpdateQueueDisplay(state)
 		local info, targetItems = private.GetDestroyInfo(itemString)
 		local scrollFrame = itemFrame:GetElement("container.scroll")
 		scrollFrame:ReleaseAllChildren()
@@ -294,6 +365,46 @@ end
 
 function private.FrameOnHide()
 	private.manager:ProcessAction("ACTION_FRAME_ON_HIDE")
+end
+
+function private.GetRemainingCasts()
+	local numCasts = 0
+	for _, row in private.query:Iterator() do
+		local quantity, minQuantity = row:GetFields("quantity", "minQuantity")
+		numCasts = numCasts + floor(quantity / minQuantity)
+	end
+	return numCasts
+end
+
+---@param state DestroyingUIState
+function private.UpdateQueueProgress(state)
+	local remaining = private.GetRemainingCasts()
+	if remaining < private.queueRemainingCasts then
+		private.queueProcessedCasts = private.queueProcessedCasts + private.queueRemainingCasts - remaining
+	end
+	private.queueRemainingCasts = remaining
+	private.UpdateQueueDisplay(state)
+end
+
+---@param state DestroyingUIState
+function private.UpdateQueueDisplay(state)
+	if not state.frame then
+		return
+	end
+	local remaining = private.GetRemainingCasts()
+	private.queueRemainingCasts = remaining
+	local total = private.queueProcessedCasts + remaining
+	local queueFrame = state.frame:GetElement("content.queueStatus")
+	queueFrame:GetElement("remaining")
+		:SetText(remaining == 1 and "1 cast remaining" or format("%d casts remaining", remaining))
+	local progress = total > 0 and private.queueProcessedCasts / total or 0
+	queueFrame:GetElement("progress")
+		:SetProgress(progress)
+		:SetText(format("%d / %d processed", private.queueProcessedCasts, total))
+	local nextItemString = state.frame:GetElement("content.items"):GetNextItemString()
+	queueFrame:GetElement("next")
+		:SetText(nextItemString and ("Next: "..(UIUtils.GetDisplayItemName(nextItemString) or ItemInfo.GetName(nextItemString) or "?")) or "Next: —")
+	queueFrame:Draw()
 end
 
 function private.GetDestroyInfo(itemString)
