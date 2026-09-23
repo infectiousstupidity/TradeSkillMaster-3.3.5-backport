@@ -70,14 +70,6 @@ function Cost.GetMatCost(itemString)
 	private.matsVisited[priceItemString] = true
 	local priceStr = matInfo.customValue or private.settings.defaultMatCostMethod
 	local result = CustomString.GetValue(priceStr, priceItemString)
-	if not result then
-		-- 3.3.5 fallback: the default mat cost method ("min(dbmarket, ...)") can fail to
-		-- evaluate on this backport even when AuctionDB has data. Fall back to raw sources.
-		result = CustomString.GetSourceValue("DBMarket", priceItemString)
-		if not result then
-			result = CustomString.GetSourceValue("DBMinBuyout", priceItemString)
-		end
-	end
 	private.matsVisited[priceItemString] = nil
 	return result
 end
@@ -124,20 +116,7 @@ function Cost.GetCraftedItemValue(itemString)
 	if hasCraftPriceMethod then
 		return craftPrice
 	end
-	local value = CustomString.GetValue(private.settings.defaultCraftPriceMethod, itemString)
-	if not value then
-		-- 3.3.5 fallback: defaultCraftPriceMethod ("first(dbminbuyout, dbmarket)*0.95")
-		-- references the "dbminbuyout" word source, which on this backport can make the
-		-- whole custom price string fail to evaluate (returning nil) even when AuctionDB
-		-- has data for the crafted item. That left the Profit column empty while the
-		-- Cost column (which uses defaultMatCostMethod = "min(dbmarket, ...)") still worked.
-		-- Fall back to the raw AuctionDB source values, bypassing the price-string parser.
-		value = CustomString.GetSourceValue("DBMarket", itemString)
-		if not value then
-			value = CustomString.GetSourceValue("DBMinBuyout", itemString)
-		end
-	end
-	return value
+	return CustomString.GetValue(private.settings.defaultCraftPriceMethod, itemString)
 end
 
 function Cost.GetProfitByCraftString(craftString)
