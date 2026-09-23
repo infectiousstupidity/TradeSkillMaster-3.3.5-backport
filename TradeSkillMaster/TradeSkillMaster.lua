@@ -274,6 +274,9 @@ function TSM.OnInitialize(settingsDB)
 		end
 	end
 	CustomString.RegisterSource("AuctionDB", "DBMarket", L["AuctionDB - Market Value"], GetAuctionDBPriceFunc("marketValue"), CustomString.SOURCE_TYPE.PRICE_DB)
+	CustomString.RegisterSource("AuctionDB", "DBMarketRecent", L["AuctionDB - Market Value or Recent Value"], function(itemString)
+		return TSM.AuctionDB.GetMarketOrRecentValue(itemString)
+	end, CustomString.SOURCE_TYPE.PRICE_DB)
 	CustomString.RegisterSource("AuctionDB", "DBAdaptive", L["AuctionDB - Adaptive Market Value"], function(itemString)
 		return TSM.AuctionDB.GetAdaptiveMarketValue(itemString)
 	end, CustomString.SOURCE_TYPE.PRICE_DB)
