@@ -28,6 +28,7 @@ local private = {
 	browseIndex = 1,
 	browsePendingIndexes = {},
 	browseSellerRetries = {},
+	browseInfoWaitStart = {},
 	searchRow = nil,
 	useCachedData = nil,
 	retryCount = 0,
@@ -48,6 +49,11 @@ local private = {
 local BROWSE_MISSING_INFO_RETRY_DELAY = 0.05
 local BROWSE_EMPTY_RETRY_DELAY = 0.25
 local BROWSE_EMPTY_RETRY_MAX = 12
+-- Some 3.3.5/private-server rows never finish resolving their link/info. Such a
+-- row must not keep the whole Post/Cancel scan in ST_BROWSE_CHECKING forever.
+-- Pending rows are retried concurrently and skipped only after this wall-clock
+-- timeout, so normal asynchronous item-cache resolution still has time to finish.
+local BROWSE_INFO_WAIT_TIMEOUT = 2
 local SEARCH_NOT_READY_RETRY_DELAY = 0.1
 local SEARCH_MISSING_ITEM_INFO_RETRY_DELAY = 0.1
 local SEARCH_AH_NOT_READY_RETRY_DELAY = 0.5
@@ -114,6 +120,7 @@ Scanner:OnModuleLoad(function()
 				private.retryCount = 0
 				private.browseEmptyRetryCount = 0
 				private.browseSendThrottleWaitCount = 0
+				wipe(private.browseInfoWaitStart)
 				private.browseSendIsThrottleWait = false
 				private.retryTimer:Cancel()
 				if private.pendingFuture then
@@ -270,6 +277,7 @@ Scanner:OnModuleLoad(function()
 					private.browseIndex = 1
 					wipe(private.browsePendingIndexes)
 					wipe(private.browseSellerRetries)
+					wipe(private.browseInfoWaitStart)
 				end
 				return "ST_BROWSE_CHECKING"
 			end)
@@ -706,6 +714,7 @@ function private.CheckBrowseResults()
 			local cs = private.classicStats
 			cs.seen, cs.noInfo, cs.noLink, cs.badLink, cs.nameSkip, cs.earlyReject, cs.added = 0, 0, 0, 0, 0, 0, 0
 			wipe(private.browseSellerRetries)
+			wipe(private.browseInfoWaitStart)
 		end
 		-- Some 3.3.5a cores briefly return an empty page right after a browse query.
 		-- Retry a few times instead of immediately showing an empty result set.
@@ -790,6 +799,21 @@ function private.CheckBrowseResults()
 	return true
 end
 
+function private.ShouldSkipUnresolvedBrowseRow(index, reason)
+	local now = GetTime()
+	local startTime = private.browseInfoWaitStart[index]
+	if not startTime then
+		private.browseInfoWaitStart[index] = now
+		return false
+	end
+	if now - startTime < BROWSE_INFO_WAIT_TIMEOUT then
+		return false
+	end
+	private.browseInfoWaitStart[index] = nil
+	Log.Warn("Skipping unresolved classic auction row %d after %.1fs (%s)", index, BROWSE_INFO_WAIT_TIMEOUT, reason)
+	return true
+end
+
 function private.ProcessBrowseResultClassic(index)
 	local cs = private.classicStats
 	cs.seen = cs.seen + 1
@@ -797,7 +821,7 @@ function private.ProcessBrowseResultClassic(index)
 	
 	if not rawName or rawName == "" or not buyout or not stackSize or not timeLeft then
 		cs.noInfo = cs.noInfo + 1
-		return false
+		return private.ShouldSkipUnresolvedBrowseRow(index, "auction info")
 	end
 
 	-- 3.3.5: Фильтруем по поисковой строке прямо здесь, как в Auctionator (не добавляем в browseResults, если не совпадает)
@@ -819,14 +843,15 @@ function private.ProcessBrowseResultClassic(index)
 
 	if not itemLink then
 		cs.noLink = cs.noLink + 1
-		return false
+		return private.ShouldSkipUnresolvedBrowseRow(index, "item link")
 	end
 
 	local baseItemString = ItemString.GetBase(itemLink)
 	if not baseItemString then
 		cs.badLink = cs.badLink + 1
-		return false
+		return private.ShouldSkipUnresolvedBrowseRow(index, "item string")
 	end
+	private.browseInfoWaitStart[index] = nil
 
 	-- getAll dumps the whole AH; skip items not in the requested set early so we don't
 	-- spend cycles populating SubRows for 50k irrelevant lots.

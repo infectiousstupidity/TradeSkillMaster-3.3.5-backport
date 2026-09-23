@@ -364,7 +364,10 @@ function private.ScanThread(auctionScan, scanContext)
 	-- run the scan
 	auctionScan:AddItemListQueriesThreaded(private.itemList)
 	for _, query in auctionScan:QueryIterator() do
-		query:SetIsBrowseDoneFunction(private.QueryIsBrowseDoneFunction)
+		-- Classic/WotLK QueryAuctionItems ordering is not a correctness guarantee.
+		-- Do not use the posting early-exit predicate here: a cheaper competing
+		-- auction may be on a later page. Scanning every matching page makes the
+		-- post decision use the actual lowest listing returned by the AH.
 		query:AddCustomFilter(private.QueryBuyoutFilter)
 	end
 	if not auctionScan:ScanQueriesThreaded() then
