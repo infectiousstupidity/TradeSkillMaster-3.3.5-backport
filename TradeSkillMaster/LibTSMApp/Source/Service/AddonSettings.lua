@@ -405,6 +405,17 @@ function private.ProcessUpgrade(db, upgradeObj)
 			end
 		end
 	end
+	if prevVersion < 136 then
+		for _, key, value in upgradeObj:RemovedSettingIterator("global", nil, "craftingOptions", "defaultMatCostMethod") do
+			-- Only replace the previous stock method. Preserve genuine user
+			-- customizations exactly as entered, while treating case and whitespace
+			-- differences in the stock expression as equivalent.
+			local normalized = strlower(gsub(value, "%s+", ""))
+			if normalized ~= "min(dbmarket,crafting,vendorbuy,convert(dbmarket))" then
+				db:Set("global", upgradeObj:GetScopeKey(key), "craftingOptions", "defaultMatCostMethod", value)
+			end
+		end
+	end
 	-- NOTE: When adding migrations, be careful of multiple migrations modifying the same key, as
 	-- the RemovedSettingIterator value could be stale.
 end
