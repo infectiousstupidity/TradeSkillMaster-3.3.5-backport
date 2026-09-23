@@ -637,6 +637,11 @@ end
 function private.FinalizeClassicResults(auctionScan)
 	local deadline = GetTime() + CLASSIC_ITEM_INFO_RETRY_SECONDS
 	while true do
+		-- A pending row may already have cached a nil Destroy value while its item
+		-- metadata was cold (for example when the UI rendered the value column).
+		-- Re-evaluate after metadata loads instead of letting that transient nil
+		-- survive for the rest of the scan.
+		CustomString.InvalidateCache("Destroy")
 		local pending = {}
 		local remove = {}
 		for _, query in auctionScan:QueryIterator() do
