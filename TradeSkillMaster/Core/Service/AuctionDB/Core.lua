@@ -45,6 +45,17 @@ local LOCAL_FIELD_MAX_AGE = {
 	marketValue = LOCAL_MARKET_MAX_AGE,
 	historical = LOCAL_HISTORICAL_MAX_AGE,
 }
+local LOCAL_CACHED_SOURCE_KEYS = {
+	"DBMarket",
+	"DBAdaptive",
+	"DBMinBuyout",
+	"DBRecent",
+	"DBHistorical",
+	"DBMarketRecent",
+	"DBScanSamples",
+	"DBMarketDays",
+	"DBHistoricalDays",
+}
 
 -- Fields populated locally on 3.3.5 (no App). Browse scans feed these via
 -- AuctionDB.RecordLocalScanResults so DBMinBuyout / DBMarket etc resolve
@@ -196,11 +207,7 @@ function AuctionDB.OnEnable()
 		ChatMessage.PrintfUser(L["TSM doesn't currently have any AuctionDB pricing data for your realm. We recommend you download the TSM Desktop Application from %s to automatically update your AuctionDB data (and auto-backup your TSM settings)."], ChatMessage.ColorUserAccentText("https://tradeskillmaster.com"))
 	end
 
-	CustomString.InvalidateCache("DBMarket")
-	CustomString.InvalidateCache("DBAdaptive")
-	CustomString.InvalidateCache("DBMinBuyout")
-	CustomString.InvalidateCache("DBHistorical")
-	CustomString.InvalidateCache("DBRecent")
+	private.InvalidateLocalSourceCaches()
 	CustomString.InvalidateCache("DBRegionMarketAvg")
 	CustomString.InvalidateCache("DBRegionHistorical")
 	CustomString.InvalidateCache("DBRegionSaleAvg")
@@ -312,6 +319,16 @@ function AuctionDB.GetAdaptiveMarketValue(itemString)
 	return recentValue
 end
 
+---Returns the established market value when available, otherwise the latest
+---per-scan market snapshot. The fallback is intentionally allowed to use sparse
+---evidence so callers can opt into useful pricing before DBMarket is established.
+---@param itemString string
+---@return number?
+function AuctionDB.GetMarketOrRecentValue(itemString)
+	local marketValue = AuctionDB.GetRealmItemData(itemString, "marketValue")
+	return marketValue or AuctionDB.GetRealmItemData(itemString, "marketValueRecent")
+end
+
 ---Записывает результаты локального browse-скана для использования как fallback
 ---когда AppHelper не отдал AuctionDB данные (3.3.5 без TSM Desktop App).
 ---Совместим с двумя форматами входа:
@@ -335,14 +352,7 @@ function AuctionDB.RecordLocalScanResults(results)
 	end
 	if count > 0 then
 		private.localScanTime = maxTs
-		CustomString.InvalidateCache("DBMarket")
-		CustomString.InvalidateCache("DBAdaptive")
-		CustomString.InvalidateCache("DBMinBuyout")
-		CustomString.InvalidateCache("DBRecent")
-		CustomString.InvalidateCache("DBHistorical")
-		CustomString.InvalidateCache("DBScanSamples")
-		CustomString.InvalidateCache("DBMarketDays")
-		CustomString.InvalidateCache("DBHistoricalDays")
+		private.InvalidateLocalSourceCaches()
 	end
 end
 
@@ -352,15 +362,17 @@ end
 -- Private Helper Functions
 -- ============================================================================
 
+function private.InvalidateLocalSourceCaches()
+	for _, source in ipairs(LOCAL_CACHED_SOURCE_KEYS) do
+		CustomString.InvalidateCache(source)
+	end
+end
+
 function private.FreshnessTimerHandler()
 	-- PRICE_DB sources cache values indefinitely until invalidated. These local
 	-- sources have age-based validity, so periodically clear their caches to make
 	-- 12h / 15d / 60d expirations take effect during a long-running session.
-	CustomString.InvalidateCache("DBMarket")
-	CustomString.InvalidateCache("DBAdaptive")
-	CustomString.InvalidateCache("DBMinBuyout")
-	CustomString.InvalidateCache("DBRecent")
-	CustomString.InvalidateCache("DBHistorical")
+	private.InvalidateLocalSourceCaches()
 	CustomString.InvalidateCache("DBRegionMarketAvg")
 	private.freshnessTimer:RunForTime(FRESHNESS_CACHE_INVALIDATION_INTERVAL)
 end
