@@ -9,11 +9,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOP_LEVEL_TOC_GLOB = "*/*.toc"
-XML_REF_RE = re.compile(r"<\\s*(?:Script|Include)\\b[^>]*\\bfile\\s*=\\s*([\\"'])(.*?)\\1", re.IGNORECASE)
-PLACEHOLDER_RE = re.compile(
-    r"(?<!%)%(?!%)(?:\\d+\\$)?[-+ #0]*(?:\\d+|\\*)?(?:\\.(?:\\d+|\\*))?([cdeEfgGiouqsxX])"
+XML_REF_RE = re.compile(
+    r"""<\s*(?:Script|Include)\b[^>]*\bfile\s*=\s*(["'])(.*?)\1""",
+    re.IGNORECASE,
 )
-CONFLICT_RE = re.compile(r"^(?:<<<<<<< |>>>>>>> |=======\\s*$)", re.MULTILINE)
+PLACEHOLDER_RE = re.compile(
+    r"(?<!%)%(?!%)(?:\d+\$)?[-+ #0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?([cdeEfgGiouqsxX])"
+)
+CONFLICT_RE = re.compile(r"^(?:<<<<<<< |>>>>>>> |=======\s*$)", re.MULTILINE)
 
 
 class ValidationError(Exception):
@@ -29,7 +32,7 @@ def read_text(path: Path) -> str:
 
 
 def resolve_reference(owner: Path, raw_reference: str) -> Path:
-    normalized = raw_reference.strip().replace("\\\\", "/")
+    normalized = raw_reference.strip().replace("\\", "/")
     return (owner.parent / normalized).resolve()
 
 
@@ -95,7 +98,7 @@ def check_interface_versions() -> None:
     for toc in sorted(ROOT.glob(TOP_LEVEL_TOC_GLOB)):
         interface = None
         for line in read_text(toc).splitlines():
-            match = re.match(r"^\\s*##\\s*Interface\\s*:\\s*(\\d+)\\s*$", line)
+            match = re.match(r"^\s*##\s*Interface\s*:\s*(\d+)\s*$", line)
             if match:
                 interface = match.group(1)
                 break
@@ -126,14 +129,14 @@ def scan_all_manifest_references() -> None:
 
 
 def parse_lua_string(text: str, start: int) -> tuple[str, int] | None:
-    if start >= len(text) or text[start] not in {"\\\"", "'"}:
+    if start >= len(text) or text[start] not in {"\"", "'"}:
         return None
     quote = text[start]
     i = start + 1
     chars: list[str] = []
     while i < len(text):
         char = text[i]
-        if char == "\\\\":
+        if char == "\\":
             if i + 1 >= len(text):
                 return None
             chars.append(text[i : i + 2])
@@ -276,7 +279,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        runtime_files, loaded_lua = collect_runtime_files()
+        _, loaded_lua = collect_runtime_files()
         if args.command == "list-lua":
             for path in sorted(loaded_lua):
                 print(rel(path))
