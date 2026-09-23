@@ -519,19 +519,28 @@ function AuctionScanManager.__private:_ProcessQuery(query)
 
 	-- run the browse query
 	self._queryDidBrowse = false
+	local preserveClassicResults = false
 	-- 3.3.5: ставим флаг сразу — это даёт прогрессу читать GetSearchProgress (browse pages) пока скан идёт
 	if not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
 		self._queryDidBrowse = true
 	end
-	while not self:_DoBrowse(query) do
+	while not self:_DoBrowse(query, preserveClassicResults) do
 		if self._shouldPause then
-			-- this browse failed due to a pause request, so try again after we're resumed
+			-- A buy/find operation temporarily cancels the active Classic browse.
+			-- Keep already-discovered rows visible while the same query restarts;
+			-- retail keeps its original wipe-and-retry behavior.
 			self:_Pause()
-			-- wipe the browse results since we're going to do another search
-			query:WipeBrowseResults()
+			if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
+				query:WipeBrowseResults()
+			else
+				preserveClassicResults = true
+			end
 		else
 			return false, 0
 		end
+	end
+	if preserveClassicResults then
+		query:PruneClassicBrowseResultsToCurrentBrowse()
 	end
 	self._queryDidBrowse = true
 	self:_NotifyProgressUpdate()
@@ -609,8 +618,8 @@ function AuctionScanManager.__private:_ProcessQuery(query)
 	return true, numNewResults
 end
 
-function AuctionScanManager.__private:_DoBrowse(query)
-	return self:_DoBrowseSearchHelper(query, query:Browse())
+function AuctionScanManager.__private:_DoBrowse(query, preserveExistingResults)
+	return self:_DoBrowseSearchHelper(query, query:Browse(preserveExistingResults))
 end
 
 function AuctionScanManager.__private:_DoSearch(query, ...)

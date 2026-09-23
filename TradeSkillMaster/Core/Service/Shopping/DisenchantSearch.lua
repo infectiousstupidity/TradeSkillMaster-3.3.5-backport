@@ -35,6 +35,8 @@ local MAX_PER_ITEM_DE_SCAN = 150
 -- the settings (e.g. 9999) producing pointless filter passes on impossible
 -- levels. The min level is left untouched (user's choice).
 local MAX_DE_ITEM_LEVEL = 284
+local CLASSIC_ITEM_INFO_RETRY_SECONDS = 2
+local CLASSIC_ITEM_INFO_RETRY_INTERVAL = 0.1
 
 -- Native scan engine constants — ported from Core/UI/AuctionUI/FullScan.lua
 -- StartPagedScan. Bypasses AuctionScanManager/Query/Scanner pipeline entirely
@@ -402,9 +404,16 @@ end
 -- ============================================================================
 
 function private.ScanThread(auctionScan)
-	-- 3.3.5 fix: check both App data and local scan data.
-	-- AppData stays 0 on private servers without TSM Desktop App, so the original
-	-- check rejected every scan even when LastScanIterator had fresh local data.
+	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
+		return private.ScanRetail(auctionScan)
+	end
+	return private.ScanClassic(auctionScan)
+end
+
+-- Retail keeps the upstream AuctionDB-seeded item-list behavior. The 3.3.5
+-- path below deliberately does not: the live AH is the source of truth for
+-- what is currently for sale, while AuctionDB is used only by price sources.
+function private.ScanRetail(auctionScan)
 	local hasAppData = TSM.AuctionDB.GetAppDataUpdateTimes() >= time() - 60 * 60 * 12
 	local hasLocalData = TSM.AuctionDB.HasLocalScanData and TSM.AuctionDB.HasLocalScanData()
 	if not hasAppData and not hasLocalData then
@@ -412,100 +421,108 @@ function private.ScanThread(auctionScan)
 		return false
 	end
 
-	local tScanStart = GetTime()
-
-	-- create the list of items
 	wipe(private.itemList)
-	local total, notDE, badLevel, tooExpensive, noDEValue, included = 0, 0, 0, 0, 0, 0
-	local firstNoDE
 	for itemString, minBuyout in TSM.AuctionDB.LastScanIteratorThreaded() do
-		if minBuyout then
-			total = total + 1
-			local reason = private.ShouldIncludeDebug(itemString, minBuyout)
-			if reason == "ok" then
-				included = included + 1
-				tinsert(private.itemList, itemString)
-			elseif reason == "not_de" then notDE = notDE + 1
-			elseif reason == "bad_level" then badLevel = badLevel + 1
-			elseif reason == "no_de_value" then
-				noDEValue = noDEValue + 1
-				if not firstNoDE then firstNoDE = itemString end
-			elseif reason == "too_expensive" then tooExpensive = tooExpensive + 1
-			end
+		if minBuyout and private.ShouldInclude(itemString, minBuyout) then
+			tinsert(private.itemList, itemString)
 		end
 		Threading.Yield()
 	end
 
-	-- Keep a user-facing warning if the pre-filter rejected everything (most commonly
-	-- because there's no recent AuctionDB data for the disenchant materials).
-	if included == 0 then
-		ChatMessage.PrintUser("DE Scan: no scannable items - make sure you've done a recent Full Scan so material prices (dust/essence/shard) are known.")
+	auctionScan:AddItemListQueriesThreaded(private.itemList)
+	for _, query in auctionScan:QueryIterator() do
+		query:AddCustomFilter(private.QueryFilter)
 	end
+	private.filterStats = nil
+	if not auctionScan:ScanQueriesThreaded() then
+		ChatMessage.PrintUser(L["TSM failed to scan some auctions. Please rerun the scan."])
+		return false
+	end
+	return true
+end
 
-	-- run the scan: classic 3.3.5 uses one getAll query (single AH dump),
-	-- early-rejection in Scanner skips non-DE items by baseItemString.
-	-- If getAll is on server CD (15 min), fall back to single broad slowscan query
-	-- (minQuality=2) — Scanner SetItems early-reject filters the rest.
-	-- Retail: keep per-item queries (no getAll on retail).
-	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
-		auctionScan:AddItemListQueriesThreaded(private.itemList)
-	elseif private.useNativeScan then
-		local nativeDone = false
-		private.NativeStart(private.itemList, function() nativeDone = true end)
-		-- Yield this thread until the native engine reports done.
+-- On 3.3.5, discover candidates from the current AH instead of from
+-- AuctionDB.LastScanIteratorThreaded(). The old ordering meant a currently
+-- listed item could never appear unless a previous AuctionDB scan had already
+-- seen and valued it.
+function private.ScanClassic(auctionScan)
+	private.filterStats = {
+		notDE = 0,
+		badLevel = 0,
+		noDEValue = 0,
+		tooExpensive = 0,
+		noBuyout = 0,
+		pending = 0,
+		unresolved = 0,
+	}
+
+	if private.useNativeScan then
+		-- Keep the diagnostic native path available. It is not the production UI path.
+		wipe(private.itemList)
+		for itemString, minBuyout in TSM.AuctionDB.LastScanIteratorThreaded() do
+			if minBuyout and private.ShouldInclude(itemString, minBuyout) then
+				tinsert(private.itemList, itemString)
+			end
+			Threading.Yield()
+		end
+		local nativeDone, nativeSuccess = false, false
+		private.NativeStart(private.itemList, function(success)
+			nativeSuccess = success
+			nativeDone = true
+		end)
 		while not nativeDone do
 			Threading.Yield()
 		end
-		-- Native engine prints its own results to chat; AuctionScanManager queue
-		-- stays empty, so UI table will be empty. Use chat output for prices.
-	else
-		local canGetAll = USE_GET_ALL and AuctionHouse.CanSendGetAllQuery()
-		local forcedGetAll = false
-		if not canGetAll and FORCE_GET_ALL then
-			AuctionHouse.SetForceGetAll(true)
-			forcedGetAll = true
-			canGetAll = true
-		end
-		-- print(string.format("|cFFFFA500TSM:|r DE Sniper getAll check -> canGetAll=%s forced=%s", tostring(canGetAll), tostring(forcedGetAll)))
-		if canGetAll then
-			auctionScan:NewQuery()
-				:SetStr("", false)
-				:SetUseGetAll(true)
-				:SetUsePriceSort(true)
-				:SetItems(private.itemList)
-			if forcedGetAll then
-				AuctionHouse.SetForceGetAll(false)
-			end
-		else
-			-- print("|cFFFFA500TSM:|r DE Sniper falling back to legacy page scan")
-			-- Weapon: Enum.ItemClass.Weapon=2 -> AH classIndex=1 (translated in Wrapper)
-			auctionScan:NewQuery()
-				:SetStr("", false)
-				:SetClass(Enum.ItemClass.Weapon)
-				:SetQualityRange(SLOWSCAN_MIN_QUALITY, nil)
-				:SetUsePriceSort(true)
-				:SetIsBrowseDoneFunction(private.QueryIsBrowseDoneFunction)
-				:SetItems(private.itemList)
-			-- Armor: Enum.ItemClass.Armor=4 -> AH classIndex=2 (translated in Wrapper)
-			auctionScan:NewQuery()
-				:SetStr("", false)
-				:SetClass(Enum.ItemClass.Armor)
-				:SetQualityRange(SLOWSCAN_MIN_QUALITY, nil)
-				:SetUsePriceSort(true)
-				:SetIsBrowseDoneFunction(private.QueryIsBrowseDoneFunction)
-				:SetItems(private.itemList)
-		end
+		return nativeSuccess
 	end
-	local queryCount = 0
+
+	local canGetAll = USE_GET_ALL and AuctionHouse.CanSendGetAllQuery()
+	local forcedGetAll = false
+	if not canGetAll and FORCE_GET_ALL then
+		AuctionHouse.SetForceGetAll(true)
+		forcedGetAll = true
+		canGetAll = true
+	end
+
+	if canGetAll then
+		auctionScan:NewQuery()
+			:SetStr("", false)
+			:SetQualityRange(SLOWSCAN_MIN_QUALITY, nil)
+			:SetUseGetAll(true)
+			:SetUsePriceSort(true)
+			:SetIncrementalFilter(true)
+		if forcedGetAll then
+			AuctionHouse.SetForceGetAll(false)
+		end
+	else
+		-- All disenchantable 3.3.5 equipment is in Weapon or Armor. Scan those
+		-- live and let QueryFilter apply DE / ilvl / value / profitability rules.
+		auctionScan:NewQuery()
+			:SetStr("", false)
+			:SetClass(Enum.ItemClass.Weapon)
+			:SetQualityRange(SLOWSCAN_MIN_QUALITY, nil)
+			:SetUsePriceSort(true)
+			:SetIncrementalFilter(true)
+		auctionScan:NewQuery()
+			:SetStr("", false)
+			:SetClass(Enum.ItemClass.Armor)
+			:SetQualityRange(SLOWSCAN_MIN_QUALITY, nil)
+			:SetUsePriceSort(true)
+			:SetIncrementalFilter(true)
+	end
+
 	for _, query in auctionScan:QueryIterator() do
 		query:AddCustomFilter(private.QueryFilter)
-		queryCount = queryCount + 1
 	end
-	private.filterStats = { kept = 0, keptNoItem = 0, keptNoBuyout = 0, dropTooHigh = 0 }
 
 	if not auctionScan:ScanQueriesThreaded() then
 		ChatMessage.PrintUser(L["TSM failed to scan some auctions. Please rerun the scan."])
+		return false
 	end
+
+	private.FinalizeClassicResults(auctionScan)
+	private.PrintClassicSummary(auctionScan)
+	return true
 end
 
 function private.ShouldInclude(itemString, minBuyout)
@@ -547,51 +564,141 @@ function private.ShouldIncludeDebug(itemString, minBuyout)
 end
 
 function private.QueryFilter(_, row)
-	local s = private.filterStats
+	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
+		local itemString = row:GetItemString()
+		if not itemString then
+			return false
+		end
+		local _, itemBuyout = row:GetBuyouts()
+		return itemBuyout and private.IsItemBuyoutTooHigh(itemString, itemBuyout) or false
+	end
+
+	local reason = private.GetClassicFilterReason(row)
+	local stats = private.filterStats
+	if reason == "ok" then
+		return false
+	elseif reason == "pending" then
+		if stats then stats.pending = stats.pending + 1 end
+		return false
+	end
+	if stats and stats[reason] ~= nil then
+		stats[reason] = stats[reason] + 1
+	end
+	return true
+end
+
+-- Return a stable filter decision for a live Classic auction. Missing item
+-- metadata is not treated as "not disenchantable": calling the ItemInfo getters
+-- requests the data, and the row is kept until FinalizeClassicResults retries it.
+function private.GetClassicFilterReason(row)
 	local itemString = row:GetItemString()
 	if not itemString then
-		if s then s.keptNoItem = s.keptNoItem + 1 end
-		return false
+		return "pending"
 	end
 	local _, itemBuyout = row:GetBuyouts()
-	if not itemBuyout then
-		if s then s.keptNoBuyout = s.keptNoBuyout + 1 end
-		return false
+	if not itemBuyout or itemBuyout <= 0 then
+		return "noBuyout"
 	end
-	local tooHigh = private.IsItemBuyoutTooHigh(itemString, itemBuyout)
-	if s then
-		if tooHigh then s.dropTooHigh = s.dropTooHigh + 1
-		else s.kept = s.kept + 1 end
+
+	local baseItemString = ItemString.GetBase(itemString)
+	local classId = baseItemString and ItemInfo.GetClassId(baseItemString) or nil
+	local quality = baseItemString and ItemInfo.GetQuality(baseItemString) or nil
+	local itemLevel = baseItemString and ItemInfo.GetItemLevel(baseItemString) or nil
+	local invSlotId = baseItemString and ItemInfo.GetInvSlotId(baseItemString) or nil
+	if not classId or not quality or not itemLevel or not invSlotId then
+		local _, rawLink = row:GetLinks()
+		if rawLink then
+			_G.GetItemInfo(rawLink)
+		end
+		return "pending"
 	end
-	return tooHigh
+	if not ItemInfo.IsDisenchantable(baseItemString) then
+		return "notDE"
+	end
+
+	local maxLevel = math.min(private.settings.maxDeSearchLvl, MAX_DE_ITEM_LEVEL)
+	if itemLevel < private.settings.minDeSearchLvl or itemLevel > maxLevel then
+		return "badLevel"
+	end
+
+	local disenchantValue = CustomString.GetSourceValue("Destroy", itemString)
+	if not disenchantValue or disenchantValue <= 0 then
+		return "noDEValue"
+	end
+	if itemBuyout > private.settings.maxDeSearchPercent / 100 * disenchantValue then
+		return "tooExpensive"
+	end
+	return "ok"
+end
+
+-- The initial live scan keeps rows whose item metadata is still cold. Resolve
+-- all such rows together for a bounded period rather than rejecting each one on
+-- the first nil GetItemInfo result (which disproportionately hid old gear).
+function private.FinalizeClassicResults(auctionScan)
+	local deadline = GetTime() + CLASSIC_ITEM_INFO_RETRY_SECONDS
+	while true do
+		local pending = {}
+		local remove = {}
+		for _, query in auctionScan:QueryIterator() do
+			for _, row in query:BrowseResultsIterator() do
+				for _, subRow in row:SubRowIterator() do
+					local reason = private.GetClassicFilterReason(subRow)
+					if reason == "pending" then
+						tinsert(pending, subRow)
+					elseif reason ~= "ok" then
+						tinsert(remove, { subRow, reason })
+					end
+				end
+			end
+		end
+
+		for _, info in ipairs(remove) do
+			local subRow, reason = info[1], info[2]
+			local resultRow = subRow:GetResultRow()
+			if resultRow then
+				resultRow:RemoveSubRow(subRow)
+				if private.filterStats and private.filterStats[reason] ~= nil then
+					private.filterStats[reason] = private.filterStats[reason] + 1
+				end
+			end
+		end
+
+		if #pending == 0 then
+			return
+		elseif GetTime() >= deadline then
+			for _, subRow in ipairs(pending) do
+				local resultRow = subRow:GetResultRow()
+				if resultRow then
+					resultRow:RemoveSubRow(subRow)
+					private.filterStats.unresolved = private.filterStats.unresolved + 1
+				end
+			end
+			return
+		end
+		Threading.Sleep(CLASSIC_ITEM_INFO_RETRY_INTERVAL)
+	end
+end
+
+function private.PrintClassicSummary(auctionScan)
+	local itemCount, auctionCount = 0, 0
+	for _, query in auctionScan:QueryIterator() do
+		for _, row in query:BrowseResultsIterator() do
+			itemCount = itemCount + 1
+			for _, subRow in row:SubRowIterator() do
+				local _, numAuctions = subRow:GetQuantities()
+				auctionCount = auctionCount + (numAuctions or 1)
+			end
+		end
+	end
+	local s = private.filterStats
+	print(string.format(
+		"|cFFFFA500TSM DE Scan:|r kept=%d items / %d auctions; filtered notDE=%d ilvl=%d noValue=%d tooExpensive=%d noBuyout=%d unresolved=%d",
+		itemCount, auctionCount, s.notDE, s.badLevel, s.noDEValue, s.tooExpensive, s.noBuyout, s.unresolved))
 end
 
 function private.IsItemBuyoutTooHigh(itemString, itemBuyout)
 	local disenchantValue = CustomString.GetSourceValue("Destroy", itemString)
 	return not disenchantValue or itemBuyout > private.settings.maxDeSearchPercent / 100 * disenchantValue
-end
-
-function private.QueryIsBrowseDoneFunction(query)
-	for itemString in query:ItemIterator() do
-		local disenchantValue = CustomString.GetSourceValue("Destroy", itemString)
-		if disenchantValue then
-			local maxBuyout = private.settings.maxDeSearchPercent / 100 * disenchantValue
-			local cheapestItemBuyout = nil
-			for _, subRow in query:ItemSubRowIterator(itemString) do
-				local _, itemBuyout = subRow:GetBuyouts()
-				if itemBuyout and (not cheapestItemBuyout or itemBuyout < cheapestItemBuyout) then
-					cheapestItemBuyout = itemBuyout
-				end
-			end
-			if not cheapestItemBuyout then
-				return false
-			end
-			if cheapestItemBuyout <= maxBuyout then
-				return false
-			end
-		end
-	end
-	return true
 end
 
 function private.MarketValueFunction(row)

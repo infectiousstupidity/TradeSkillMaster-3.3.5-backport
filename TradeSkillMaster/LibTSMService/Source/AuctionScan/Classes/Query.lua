@@ -76,6 +76,7 @@ function AuctionQuery:__init()
 	self._callback = nil
 	self._browseResults = {} ---@type table<string,AuctionRow>
 	self._page = 0
+	self._currentBrowseId = 0
 	self._staleSubRowsCleared = false
 	self._accumulate = false
 	self._useGetAll = false
@@ -127,6 +128,7 @@ function AuctionQuery:_Release()
 	end
 	wipe(self._browseResults)
 	self._page = 0
+	self._currentBrowseId = 0
 	self._staleSubRowsCleared = false
 	self._accumulate = false
 	self._useGetAll = false
@@ -383,12 +385,14 @@ function AuctionQuery:SetCallback(callback)
 end
 
 ---Starts the browse query.
+---@param preserveExistingResults? boolean Keep already-discovered Classic results while retrying an interrupted browse
 ---@return Future
-function AuctionQuery:Browse()
-	-- 3.3.5: очищаем stale subRows перед новым browse (чтобы UI не показывал старые лоты)
+function AuctionQuery:Browse(preserveExistingResults)
+	-- 3.3.5: clear stale subRows for a genuinely new browse, but preserve them
+	-- when ScanManager is resuming the same query after a buy/pause interruption.
 	-- Sniper accumulate mode (SetAccumulate) skips this wipe so found lots persist
 	-- in the list across rescans instead of vanishing each pass.
-	if not self._accumulate and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
+	if not preserveExistingResults and not self._accumulate and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
 		local numRows = 0
 		local numSubRows = 0
 		for _, row in pairs(self._browseResults) do
@@ -620,6 +624,40 @@ function AuctionQuery:WipeBrowseResults()
 	if self._callback then
 		self:_callback()
 	end
+end
+
+
+---Sets the browse generation currently being populated by Scanner.
+---@param browseId number
+function AuctionQuery:_SetCurrentBrowseId(browseId)
+	self._currentBrowseId = browseId
+end
+
+---Drops Classic results which were not observed by the latest completed browse.
+---Used after resuming an interrupted scan: existing rows stay visible while the
+---retry runs, then genuinely stale rows are removed once the retry completes.
+function AuctionQuery:PruneClassicBrowseResultsToCurrentBrowse()
+	assert(not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE))
+	local currentBrowseId = self._currentBrowseId
+	if not currentBrowseId or currentBrowseId == 0 then
+		return
+	end
+	local remove = TempTable.Acquire()
+	for _, row in pairs(self._browseResults) do
+		for _, subRow in row:SubRowIterator() do
+			local _, _, browseId = subRow:GetListingInfo()
+			if browseId ~= currentBrowseId then
+				tinsert(remove, subRow)
+			end
+		end
+	end
+	for _, subRow in ipairs(remove) do
+		local row = subRow:GetResultRow()
+		if row then
+			row:RemoveSubRow(subRow)
+		end
+	end
+	TempTable.Release(remove)
 end
 
 
