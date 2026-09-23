@@ -60,6 +60,7 @@ function AuctionQuery:__init()
 	self._invType = FILTER_NOT_SET
 	self._classFilter1 = {}
 	self._classFilter2 = {}
+	self._classicServerFiltersOnly = false
 	self._usable = false
 	self._uncollected = false
 	self._upgrades = false
@@ -76,6 +77,7 @@ function AuctionQuery:__init()
 	self._callback = nil
 	self._browseResults = {} ---@type table<string,AuctionRow>
 	self._page = 0
+	self._currentBrowseId = 0
 	self._staleSubRowsCleared = false
 	self._accumulate = false
 	self._useGetAll = false
@@ -108,6 +110,7 @@ function AuctionQuery:_Release()
 	self._invType = FILTER_NOT_SET
 	wipe(self._classFilter1)
 	wipe(self._classFilter2)
+	self._classicServerFiltersOnly = false
 	self._usable = false
 	self._uncollected = false
 	self._upgrades = false
@@ -127,6 +130,7 @@ function AuctionQuery:_Release()
 	end
 	wipe(self._browseResults)
 	self._page = 0
+	self._currentBrowseId = 0
 	self._staleSubRowsCleared = false
 	self._accumulate = false
 	self._useGetAll = false
@@ -206,6 +210,16 @@ function AuctionQuery:SetClass(class, subClass, invType)
 	self._class = class or FILTER_NOT_SET
 	self._subClass = subClass or FILTER_NOT_SET
 	self._invType = invType or FILTER_NOT_SET
+	return self
+end
+
+---Uses Classic class / quality query settings only for the server request.
+---Client-side filtering is delegated to a custom filter which can explicitly
+---handle unresolved item metadata instead of treating temporary nils as rejects.
+---@param enabled boolean
+---@return AuctionQuery
+function AuctionQuery:SetClassicServerFiltersOnly(enabled)
+	self._classicServerFiltersOnly = enabled and true or false
 	return self
 end
 
@@ -383,12 +397,14 @@ function AuctionQuery:SetCallback(callback)
 end
 
 ---Starts the browse query.
+---@param preserveExistingResults? boolean Keep already-discovered Classic results while retrying an interrupted browse
 ---@return Future
-function AuctionQuery:Browse()
-	-- 3.3.5: очищаем stale subRows перед новым browse (чтобы UI не показывал старые лоты)
+function AuctionQuery:Browse(preserveExistingResults)
+	-- 3.3.5: clear stale subRows for a genuinely new browse, but preserve them
+	-- when ScanManager is resuming the same query after a buy/pause interruption.
 	-- Sniper accumulate mode (SetAccumulate) skips this wipe so found lots persist
 	-- in the list across rescans instead of vanishing each pass.
-	if not self._accumulate and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
+	if not preserveExistingResults and not self._accumulate and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
 		local numRows = 0
 		local numSubRows = 0
 		for _, row in pairs(self._browseResults) do
@@ -623,6 +639,43 @@ function AuctionQuery:WipeBrowseResults()
 end
 
 
+---Sets the browse generation currently being populated by Scanner.
+---@param browseId number
+function AuctionQuery:_SetCurrentBrowseId(browseId)
+	self._currentBrowseId = browseId
+end
+
+---Drops Classic results which were not observed by the latest completed browse.
+---Used after resuming an interrupted scan: existing rows stay visible while the
+---retry runs, then genuinely stale rows are removed once the retry completes.
+function AuctionQuery:PruneClassicBrowseResultsToCurrentBrowse()
+	assert(not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE))
+	local currentBrowseId = self._currentBrowseId
+	if not currentBrowseId or currentBrowseId == 0 then
+		return
+	end
+	local remove = TempTable.Acquire()
+	for _, row in pairs(self._browseResults) do
+		for _, subRow in row:SubRowIterator() do
+			local _, _, browseId = subRow:GetListingInfo()
+			if browseId ~= currentBrowseId then
+				tinsert(remove, subRow)
+			end
+		end
+	end
+	for _, subRow in ipairs(remove) do
+		local row = subRow:GetResultRow()
+		if row then
+			row:RemoveSubRow(subRow)
+		end
+	end
+	TempTable.Release(remove)
+	for _, row in pairs(self._browseResults) do
+		row._minBrowseId = currentBrowseId
+	end
+end
+
+
 
 -- ============================================================================
 -- Private Class Methods (Called by the Scanner Code)
@@ -740,17 +793,20 @@ function AuctionQuery:_IsFiltered(row, isSubRow, itemKey)
 	if itemLevel and (itemLevel < self._minItemLevel or itemLevel > self._maxItemLevel) then
 		return true
 	end
-	if quality and (quality < self._minQuality or quality > self._maxQuality) then
-		return true
-	end
-	if self._class ~= FILTER_NOT_SET and ItemInfo.GetClassId(baseItemString) ~= self._class then
-		return true
-	end
-	if self._subClass ~= FILTER_NOT_SET and ItemInfo.GetSubClassId(baseItemString) ~= self._subClass then
-		return true
-	end
-	if self._invType ~= FILTER_NOT_SET and ItemInfo.GetInvSlotId(baseItemString) ~= self._invType then
-		return true
+	local skipClassicServerFilters = self._classicServerFiltersOnly and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE)
+	if not skipClassicServerFilters then
+		if quality and (quality < self._minQuality or quality > self._maxQuality) then
+			return true
+		end
+		if self._class ~= FILTER_NOT_SET and ItemInfo.GetClassId(baseItemString) ~= self._class then
+			return true
+		end
+		if self._subClass ~= FILTER_NOT_SET and ItemInfo.GetSubClassId(baseItemString) ~= self._subClass then
+			return true
+		end
+		if self._invType ~= FILTER_NOT_SET and ItemInfo.GetInvSlotId(baseItemString) ~= self._invType then
+			return true
+		end
 	end
 	-- luacheck: globals CanIMogIt
 	--! WotLK fix: test CanIMogIt for existence, not just the filter flag. It is a
