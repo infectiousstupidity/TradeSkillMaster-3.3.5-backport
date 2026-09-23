@@ -362,7 +362,7 @@ function private.ScanThread(auctionScan, scanContext)
 	TSM.Auctioning.SavedSearches.RecordSearch(scanContext, scanContext.isItems and "postItems" or "postGroups")
 
 	-- run the scan
-	auctionScan:AddItemListQueriesThreaded(private.itemList)
+	auctionScan:AddItemListQueriesThreaded(private.itemList, true)
 	for _, query in auctionScan:QueryIterator() do
 		-- Classic/WotLK QueryAuctionItems ordering is not a correctness guarantee.
 		-- Do not use the posting early-exit predicate here: a cheaper competing

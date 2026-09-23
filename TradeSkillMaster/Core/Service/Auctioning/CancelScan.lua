@@ -220,7 +220,7 @@ function private.ScanThread(auctionScan, groupList)
 	TSM.Auctioning.SavedSearches.RecordSearch(groupList, "cancelGroups")
 
 	-- run the scan
-	auctionScan:AddItemListQueriesThreaded(private.itemList)
+	auctionScan:AddItemListQueriesThreaded(private.itemList, true)
 	for _, query2 in auctionScan:QueryIterator() do
 		query2:AddCustomFilter(private.QueryBuyoutFilter)
 	end
