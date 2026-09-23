@@ -210,7 +210,8 @@ end
 
 ---Adds queries which are generated from a list of items.
 ---@param itemList string[] The list of items to generate and add queries for
-function AuctionScanManager:AddItemListQueriesThreaded(itemList)
+---@param exactClassic boolean? Generate one exact-name query per item on Classic
+function AuctionScanManager:AddItemListQueriesThreaded(itemList, exactClassic)
 	assert(Threading.IsThreadContext())
 	-- remove duplicates
 	local usedItems = TempTable.Acquire()
@@ -224,7 +225,7 @@ function AuctionScanManager:AddItemListQueriesThreaded(itemList)
 	TempTable.Release(usedItems)
 	self._numItems = #itemList
 	self:_SendActionScript("OnNumItemsChanged")
-	QueryUtil.GenerateThreaded(itemList, self:__closure("_AddQuery"))
+	QueryUtil.GenerateThreaded(itemList, self:__closure("_AddQuery"), exactClassic)
 end
 
 ---Scans for all the added queries and returns if they were all successful.

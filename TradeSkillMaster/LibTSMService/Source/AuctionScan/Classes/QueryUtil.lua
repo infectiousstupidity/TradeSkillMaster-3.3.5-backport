@@ -32,7 +32,8 @@ local MERGE_MAX_DB_NAME_MATCHES = 30
 ---Generates auction queries for a list of items.
 ---@param itemList string[] The list of items to generate queries for
 ---@param callback fun(query: AuctionQuery) Function to call with generated queries
-function QueryUtil.GenerateThreaded(itemList, callback)
+---@param exactClassic boolean? Generate one exact-name query per item on Classic
+function QueryUtil.GenerateThreaded(itemList, callback, exactClassic)
 	-- Get all the item info into the game's cache
 	for _ = 1, MAX_ITEM_INFO_RETRIES do
 		local isMissingItemInfo = false
@@ -93,6 +94,8 @@ function QueryUtil.GenerateThreaded(itemList, callback)
 			wipe(currentItems)
 		end
 		TempTable.Release(currentItems)
+	elseif exactClassic then
+		private.GenerateClassicExactQueriesThreaded(itemList, callback)
 	else
 		private.GenerateClassicQueriesThreaded(itemList, callback)
 	end
@@ -139,6 +142,23 @@ function private.ItemListSortHelper(a, b)
 		return aSortValue < bSortValue
 	end
 	return a < b
+end
+
+---Generates one exact-name Classic query per item.
+---Auctioning uses this path because its price decision must see every auction for
+---that item; merged word queries can pull many unrelated rows into the same page set.
+---@param itemList string[]
+---@param callback fun(query: AuctionQuery)
+function private.GenerateClassicExactQueriesThreaded(itemList, callback)
+	for _, itemString in ipairs(itemList) do
+		local name = ItemInfo.GetName(itemString)
+		if name then
+			callback(Query.Get()
+				:SetStr(name, true)
+				:SetItems(itemString))
+		end
+		Threading.Yield()
+	end
 end
 
 ---Generates classic item-list queries, opportunistically merging items that share a name word.
