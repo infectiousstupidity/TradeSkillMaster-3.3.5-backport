@@ -160,7 +160,8 @@ function Schema.Get()
 	-- [133] updated global.auctionUIContext.{auctioningAuctionScrollingTable,myAuctionsScrollingTable,shoppingAuctionScrollingTable,sniperScrollingTable}, factionrealm.auctioningOptions.whitelist
 	-- [134] added global.appearanceOptions.{fontFace,fontScale,itemIconSize}
 	-- [135] changed global.coreOptions.destroyValueSource default to dbminbuyout
-	return Settings.NewSchema(135, 10)
+	-- [136] changed global.craftingOptions.defaultMatCostMethod to use DBMarketRecent
+	return Settings.NewSchema(136, 10)
 		:EnterScope("global")
 			:EnterNamespace("debug")
 				:AddBoolean("chatLoggingEnabled", false, 19)
@@ -277,7 +278,7 @@ function Schema.Get()
 				:AddString("confirmCompleteSound", "TSM_NO_SOUND", 10)
 			:LeaveNamespace()
 			:EnterNamespace("craftingOptions")
-				:AddString("defaultMatCostMethod", "min(dbmarket, crafting, vendorbuy, convert(dbmarket))", 10)
+				:AddString("defaultMatCostMethod", "min(dbmarketrecent, crafting, vendorbuy, convert(dbmarketrecent))", 136)
 				:AddString("defaultCraftPriceMethod", "first(dbminbuyout, dbmarket)*0.95", 89)
 				:AddTable("ignoreCharacters", {}, 10)
 				:AddTable("ignoreGuilds", {}, 10)
