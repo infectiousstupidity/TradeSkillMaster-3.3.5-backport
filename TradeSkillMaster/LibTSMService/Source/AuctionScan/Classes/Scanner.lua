@@ -29,6 +29,7 @@ local private = {
 	browsePendingIndexes = {},
 	browseSellerRetries = {},
 	browseInfoWaitStart = {},
+	browseInfoFailed = false,
 	searchRow = nil,
 	useCachedData = nil,
 	retryCount = 0,
@@ -121,6 +122,7 @@ Scanner:OnModuleLoad(function()
 				private.browseEmptyRetryCount = 0
 				private.browseSendThrottleWaitCount = 0
 				wipe(private.browseInfoWaitStart)
+				private.browseInfoFailed = false
 				private.browseSendIsThrottleWait = false
 				private.retryTimer:Cancel()
 				if private.pendingFuture then
@@ -214,10 +216,16 @@ Scanner:OnModuleLoad(function()
 				if not private.query:_BrowseIsPageValid() then
 					-- This page isn't valid, so go to the next page
 					return "ST_BROWSE_REQUEST_MORE"
-				elseif not private.CheckBrowseResults() then
-					-- Results aren't valid yet, so check again
-					private.retryTimer:RunForTime(BROWSE_MISSING_INFO_RETRY_DELAY)
-					return
+				else
+					local browseResultsReady, browseResultsFailed = private.CheckBrowseResults()
+					if browseResultsFailed then
+						-- Never make pricing decisions from an incomplete Classic page.
+						return "ST_BROWSE_DONE", false
+					elseif not browseResultsReady then
+						-- Results aren't valid yet, so check again.
+						private.retryTimer:RunForTime(BROWSE_MISSING_INFO_RETRY_DELAY)
+						return
+					end
 				end
 				-- We're done with this set of browse results
 				if private.callback then
@@ -278,6 +286,7 @@ Scanner:OnModuleLoad(function()
 					wipe(private.browsePendingIndexes)
 					wipe(private.browseSellerRetries)
 					wipe(private.browseInfoWaitStart)
+					private.browseInfoFailed = false
 				end
 				return "ST_BROWSE_CHECKING"
 			end)
@@ -290,8 +299,8 @@ Scanner:OnModuleLoad(function()
 			:AddEventTransition("EV_CANCEL", "ST_CANCELING")
 		)
 		:AddState(FSM.NewState("ST_BROWSE_DONE")
-			:SetOnEnter(function()
-				private.HandleRequestDone(true)
+			:SetOnEnter(function(_, result)
+				private.HandleRequestDone(result ~= false)
 				return "ST_INIT"
 			end)
 			:AddTransition("ST_INIT")
@@ -715,6 +724,7 @@ function private.CheckBrowseResults()
 			cs.seen, cs.noInfo, cs.noLink, cs.badLink, cs.nameSkip, cs.earlyReject, cs.added = 0, 0, 0, 0, 0, 0, 0
 			wipe(private.browseSellerRetries)
 			wipe(private.browseInfoWaitStart)
+			private.browseInfoFailed = false
 		end
 		-- Some 3.3.5a cores briefly return an empty page right after a browse query.
 		-- Retry a few times instead of immediately showing an empty result set.
@@ -731,6 +741,9 @@ function private.CheckBrowseResults()
 			if private.ProcessBrowseResultClassic(index) then
 				tremove(private.browsePendingIndexes, i)
 			end
+		end
+		if private.browseInfoFailed then
+			return false, true
 		end
 		-- 3.3.5 perf: обрабатываем не дольше BROWSE_PROCESS_TIME_BUDGET_MS за
 		-- вызов; при исчерпании бюджета продолжаем на следующем кадре через
@@ -799,7 +812,7 @@ function private.CheckBrowseResults()
 	return true
 end
 
-function private.ShouldSkipUnresolvedBrowseRow(index, reason)
+function private.HandleUnresolvedBrowseRow(index, reason)
 	local now = GetTime()
 	local startTime = private.browseInfoWaitStart[index]
 	if not startTime then
@@ -810,7 +823,8 @@ function private.ShouldSkipUnresolvedBrowseRow(index, reason)
 		return false
 	end
 	private.browseInfoWaitStart[index] = nil
-	Log.Warn("Skipping unresolved classic auction row %d after %.1fs (%s)", index, BROWSE_INFO_WAIT_TIMEOUT, reason)
+	private.browseInfoFailed = true
+	Log.Err("Classic auction row %d stayed unresolved for %.1fs (%s); failing this query rather than using incomplete prices", index, BROWSE_INFO_WAIT_TIMEOUT, reason)
 	return true
 end
 
@@ -821,7 +835,7 @@ function private.ProcessBrowseResultClassic(index)
 	
 	if not rawName or rawName == "" or not buyout or not stackSize or not timeLeft then
 		cs.noInfo = cs.noInfo + 1
-		return private.ShouldSkipUnresolvedBrowseRow(index, "auction info")
+		return private.HandleUnresolvedBrowseRow(index, "auction info")
 	end
 
 	-- 3.3.5: Фильтруем по поисковой строке прямо здесь, как в Auctionator (не добавляем в browseResults, если не совпадает)
@@ -843,13 +857,13 @@ function private.ProcessBrowseResultClassic(index)
 
 	if not itemLink then
 		cs.noLink = cs.noLink + 1
-		return private.ShouldSkipUnresolvedBrowseRow(index, "item link")
+		return private.HandleUnresolvedBrowseRow(index, "item link")
 	end
 
 	local baseItemString = ItemString.GetBase(itemLink)
 	if not baseItemString then
 		cs.badLink = cs.badLink + 1
-		return private.ShouldSkipUnresolvedBrowseRow(index, "item string")
+		return private.HandleUnresolvedBrowseRow(index, "item string")
 	end
 	private.browseInfoWaitStart[index] = nil
 
