@@ -658,6 +658,9 @@ function AuctionQuery:PruneClassicBrowseResultsToCurrentBrowse()
 		end
 	end
 	TempTable.Release(remove)
+	for _, row in pairs(self._browseResults) do
+		row._minBrowseId = currentBrowseId
+	end
 end
 
 
