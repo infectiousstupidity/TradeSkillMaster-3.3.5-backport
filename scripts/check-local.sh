@@ -27,6 +27,7 @@ fi
 
 python3 scripts/validate_repo.py check --luac "$luac_bin"
 "$lua_bin" scripts/test-settings-migration.lua
+"$lua_bin" scripts/test-auctiondb-market-compat.lua
 
 if command -v luacheck >/dev/null 2>&1; then
 	mapfile -t lua_files < <(python3 scripts/validate_repo.py list-lua)
