@@ -410,7 +410,8 @@ function private.ProcessUpgrade(db, upgradeObj)
 			-- Only replace the previous stock method. Preserve genuine user
 			-- customizations exactly as entered, while treating case and whitespace
 			-- differences in the stock expression as equivalent.
-			local normalized = strlower(gsub(value, "%s+", ""))
+			local normalized = gsub(value, "%s+", "")
+			normalized = strlower(normalized)
 			if normalized ~= "min(dbmarket,crafting,vendorbuy,convert(dbmarket))" then
 				db:Set("global", upgradeObj:GetScopeKey(key), "craftingOptions", "defaultMatCostMethod", value)
 			end
