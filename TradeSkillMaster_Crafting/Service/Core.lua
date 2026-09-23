@@ -749,6 +749,7 @@ function Crafting.GetConversionsValue(itemString, customPrice, method)
 		local itemLevel = ClientInfo.IsRetail() and ItemInfo.GetItemLevel(itemString) or ItemInfo.GetItemLevel(ItemString.GetBase(itemString))
 		local expansion = ClientInfo.IsRetail() and ItemInfo.GetExpansion(itemString) or nil
 		local value = 0
+		local hasKnownValue = false
 		if quality and itemLevel and classId then
 			for targetItemString in Conversion.DisenchantTargetItemIterator() do
 				local amountOfMats = Conversions.GetDisenchantTargetItemSourceInfo(targetItemString, classId, quality, itemLevel, expansion)
@@ -759,16 +760,19 @@ function Crafting.GetConversionsValue(itemString, customPrice, method)
 					local matValue = CustomString.GetValue(customPrice, targetItemString)
 						or CustomString.GetSourceValue("DBMinBuyout", targetItemString)
 						or CustomString.GetSourceValue("DBMarket", targetItemString)
-					if not matValue or matValue == 0 then
-						return
+					-- Missing prices must not erase the entire disenchant value. Treat
+					-- unknown outputs as zero, which is a conservative lower bound:
+					-- it can hide marginal opportunities, but can never invent profit.
+					if matValue and matValue > 0 then
+						hasKnownValue = true
+						value = value + matValue * amountOfMats
 					end
-					value = value + matValue * amountOfMats
 				end
 			end
 		end
 
 		value = floor(value)
-		if value > 0 then
+		if hasKnownValue and value > 0 then
 			return value, Conversion.METHOD.DISENCHANT
 		end
 	end
