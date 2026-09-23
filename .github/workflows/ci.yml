@@ -34,6 +34,9 @@ jobs:
           LUAC="$(command -v luac5.1 || command -v luac)"
           python3 scripts/validate_repo.py check --luac "$LUAC"
 
+      - name: Test settings migrations
+        run: lua5.1 scripts/test-settings-migration.lua
+
   static-analysis:
     name: High-signal Lua static analysis
     runs-on: ubuntu-latest
