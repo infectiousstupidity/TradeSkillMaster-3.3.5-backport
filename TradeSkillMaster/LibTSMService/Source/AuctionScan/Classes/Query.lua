@@ -60,6 +60,7 @@ function AuctionQuery:__init()
 	self._invType = FILTER_NOT_SET
 	self._classFilter1 = {}
 	self._classFilter2 = {}
+	self._classicServerFiltersOnly = false
 	self._usable = false
 	self._uncollected = false
 	self._upgrades = false
@@ -109,6 +110,7 @@ function AuctionQuery:_Release()
 	self._invType = FILTER_NOT_SET
 	wipe(self._classFilter1)
 	wipe(self._classFilter2)
+	self._classicServerFiltersOnly = false
 	self._usable = false
 	self._uncollected = false
 	self._upgrades = false
@@ -208,6 +210,16 @@ function AuctionQuery:SetClass(class, subClass, invType)
 	self._class = class or FILTER_NOT_SET
 	self._subClass = subClass or FILTER_NOT_SET
 	self._invType = invType or FILTER_NOT_SET
+	return self
+end
+
+---Uses Classic class / quality query settings only for the server request.
+---Client-side filtering is delegated to a custom filter which can explicitly
+---handle unresolved item metadata instead of treating temporary nils as rejects.
+---@param enabled boolean
+---@return AuctionQuery
+function AuctionQuery:SetClassicServerFiltersOnly(enabled)
+	self._classicServerFiltersOnly = enabled and true or false
 	return self
 end
 
@@ -781,17 +793,20 @@ function AuctionQuery:_IsFiltered(row, isSubRow, itemKey)
 	if itemLevel and (itemLevel < self._minItemLevel or itemLevel > self._maxItemLevel) then
 		return true
 	end
-	if quality and (quality < self._minQuality or quality > self._maxQuality) then
-		return true
-	end
-	if self._class ~= FILTER_NOT_SET and ItemInfo.GetClassId(baseItemString) ~= self._class then
-		return true
-	end
-	if self._subClass ~= FILTER_NOT_SET and ItemInfo.GetSubClassId(baseItemString) ~= self._subClass then
-		return true
-	end
-	if self._invType ~= FILTER_NOT_SET and ItemInfo.GetInvSlotId(baseItemString) ~= self._invType then
-		return true
+	local skipClassicServerFilters = self._classicServerFiltersOnly and not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE)
+	if not skipClassicServerFilters then
+		if quality and (quality < self._minQuality or quality > self._maxQuality) then
+			return true
+		end
+		if self._class ~= FILTER_NOT_SET and ItemInfo.GetClassId(baseItemString) ~= self._class then
+			return true
+		end
+		if self._subClass ~= FILTER_NOT_SET and ItemInfo.GetSubClassId(baseItemString) ~= self._subClass then
+			return true
+		end
+		if self._invType ~= FILTER_NOT_SET and ItemInfo.GetInvSlotId(baseItemString) ~= self._invType then
+			return true
+		end
 	end
 	-- luacheck: globals CanIMogIt
 	--! WotLK fix: test CanIMogIt for existence, not just the filter flag. It is a
