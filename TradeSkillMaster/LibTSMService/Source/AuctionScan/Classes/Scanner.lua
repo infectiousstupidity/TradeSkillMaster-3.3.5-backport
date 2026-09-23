@@ -659,7 +659,27 @@ function private.RecordScanResults(query)
 	local scanData = {}
 	local count = 0
 	local prices = {}
+
+	-- An explicit item list defines an authoritative scan scope. Seed every
+	-- requested base item with an empty current snapshot so a successful query
+	-- which finds no priced auctions clears stale DBMinBuyout / DBRecent data.
+	-- Broad searches without SetItems() are not safe to invalidate by absence.
+	for _, itemString in query:ItemIterator() do
+		local baseItemString = ItemString.GetBaseFast(itemString)
+		if baseItemString and not scanData[baseItemString] then
+			scanData[baseItemString] = { na = 0, nsamples = 0 }
+			count = count + 1
+		end
+	end
+
 	for baseItemString, row in query:BrowseResultsIterator() do
+		local data = scanData[baseItemString]
+		if not data then
+			data = { na = 0, nsamples = 0 }
+			scanData[baseItemString] = data
+			count = count + 1
+		end
+
 		local minBuyout, auctionCount = nil, 0
 		wipe(prices)
 		for _, subRow in row:SubRowIterator() do
@@ -670,41 +690,36 @@ function private.RecordScanResults(query)
 					if not minBuyout or itemBuyout < minBuyout then
 						minBuyout = itemBuyout
 					end
-					-- одна точка на АУКЦИОН (как в оригинальном TSM), а не на
-					-- единицу в стаке: иначе один дешёвый стак 20 шт даёт 20
-					-- точек и полностью захватывает нижний перцентиль выборки,
-					-- отравляя marketValue
+					-- One sample per auction lot (not per item in the stack), matching
+					-- the original TSM market-value sampling semantics.
 					for _ = 1, numAuctions do
 						prices[#prices + 1] = itemBuyout
 					end
 				end
-				-- na = кол-во аукционов (лотов), а не единиц товара.
-				-- Тултип "N auctions" должен означать именно лоты.
 				auctionCount = auctionCount + numAuctions
 			end
 		end
+
+		data.na = auctionCount
+		data.nsamples = #prices
 		if minBuyout and minBuyout > 0 then
-			scanData[baseItemString] = {
-				mb = minBuyout,
-				mv = ScanUtil.CalcMarketValue(prices) or minBuyout,
-				na = auctionCount > 0 and auctionCount or nil,
-				nsamples = #prices,
-			}
-			count = count + 1
+			data.mb = minBuyout
+			data.mv = ScanUtil.CalcMarketValue(prices) or minBuyout
+		else
+			data.mb = nil
+			data.mv = nil
 		end
 	end
+
 	if count > 0 then
 		_G.TSM_AuctionDB_RecordScan(scanData)
-		-- 3.3.5: also feed the in-memory AuctionDB holder so DBMinBuyout /
-		-- DBMarket reflect this scan immediately (e.g. right after searching a
-		-- single item), instead of only after the next /reload when the
-		-- SavedVariable is re-read into the holder.
+		-- Also feed the in-memory holder so the new snapshot is visible
+		-- immediately rather than only after the next /reload.
 		if _G.TSM_AuctionDB_RecordLocalScanResults then
 			_G.TSM_AuctionDB_RecordLocalScanResults(scanData)
 		end
 		if _G.TSMDebugDB then
 			_G.TSMDebugDB.auctiondb_local = _G.TSMDebugDB.auctiondb_local or {}
-			-- sliding window: храним только последние 200 записей
 			local log = _G.TSMDebugDB.auctiondb_local
 			while #log > 200 do
 				table.remove(log, 1)

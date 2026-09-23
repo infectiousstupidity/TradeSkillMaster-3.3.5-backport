@@ -362,48 +362,59 @@ function TSM_AuctionDB_RecordScan(scanData)
 
 	for is, data in pairs(scanData) do
 		local mb, mv, na, nsamples
+		local isSnapshot = type(data) == "table"
 		if type(data) == "number" then
 			mb = data
-		elseif type(data) == "table" then
+		elseif isSnapshot then
 			mb = data.mb or data.minBuyout
 			mv = data.mv or data.marketValue
 			na = data.na or data.numAuctions
 			nsamples = data.nsamples
+		else
+			data = nil
 		end
 
-		if type(mb) == "number" and mb > 0 then
+		local hasPrice = type(mb) == "number" and mb > 0
+		if data ~= nil and (isSnapshot or hasPrice) then
 			local existing = EnsureRecord(items[is])
-			existing.mb = mb
-			if type(na) == "number" and na > 0 then
-				existing.na = na
-			end
-			if type(nsamples) == "number" and nsamples >= 0 then
-				existing.ns = nsamples
-			end
-			existing.ts = now
-			-- migDay is only for records migrated from the pre-v4 aggregate format.
-			-- New records must not treat their own freshly-computed market value as a
-			-- legacy baseline on subsequent scans (which would double-weight it).
 
-			if type(mv) == "number" and mv > 0 then
-				existing.mv = mv
-				TryConfirmPending(existing, nsamples, today)
-				if ShouldAcceptSnapshot(existing, mv, nsamples, today) then
-					AcceptSnapshot(existing, mv, today)
+			if isSnapshot then
+				-- Table entries are authoritative current snapshots. Clearing these
+				-- fields is intentional when a complete scan found no priced auctions.
+				existing.mb = hasPrice and mb or nil
+				existing.mv = (type(mv) == "number" and mv > 0) and mv or existing.mb
+				existing.na = (type(na) == "number" and na >= 0) and na or nil
+				existing.ns = (type(nsamples) == "number" and nsamples >= 0) and nsamples or nil
+				existing.ts = now
+
+				-- Finalize a previous day's accepted snapshots even if today's
+				-- authoritative observation is empty.
+				FoldDayIfNeeded(existing, today)
+				if existing.mv and existing.mv > 0 then
+					TryConfirmPending(existing, existing.ns, today)
+					if ShouldAcceptSnapshot(existing, existing.mv, existing.ns, today) then
+						AcceptSnapshot(existing, existing.mv, today)
+					end
 				end
 				local mkt, hist = RecomputeAggregates(existing, today)
-				if type(data) == "table" then
-					data.mkt = mkt or existing.mkt
-					data.hist = hist or existing.hist
-				end
-			end
 
-			if type(data) == "table" then
+				-- Feed the exact persisted state back to the in-memory recorder.
+				data.mb = existing.mb
+				data.mv = existing.mv
+				data.na = existing.na
+				data.nsamples = existing.ns
+				data.mkt = mkt
+				data.hist = hist
 				data.ts = now
 				data.scanSamples = existing.ns
 				data.marketDays = existing.mktDays or 0
 				data.historicalDays = existing.histDays or 0
+			else
+				-- Legacy numeric input only carries a min-buyout observation.
+				existing.mb = mb
+				existing.ts = now
 			end
+
 			items[is] = existing
 			recorded = recorded + 1
 		end
