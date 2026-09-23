@@ -43,6 +43,7 @@ local private = {
 	doneTimer = nil,
 	updateTimer = nil,
 	missingItemIds = {},
+	auctionDBScanData = nil,
 	-- 3.3.5 diagnostics: per-scan counters for the classic browse processing
 	-- pipeline (printed for traced queries, e.g. DE scan)
 	classicStats = { seen = 0, noInfo = 0, noLink = 0, badLink = 0, nameSkip = 0, earlyReject = 0, added = 0 },
@@ -124,6 +125,7 @@ Scanner:OnModuleLoad(function()
 				wipe(private.browseInfoWaitStart)
 				private.browseInfoFailed = false
 				private.browseSendIsThrottleWait = false
+				private.auctionDBScanData = nil
 				private.retryTimer:Cancel()
 				if private.pendingFuture then
 					private.pendingFuture:Cancel()
@@ -142,6 +144,7 @@ Scanner:OnModuleLoad(function()
 				private.browseId = private.browseId + 1
 				private.browseIsNoScan = false
 				private.callback = callback
+				private.StartAuctionDBScan(query)
 				return "ST_BROWSE_SORT"
 			end)
 			:AddEvent("EV_START_BROWSE_NO_SCAN", function(_, query, itemKeys, callback)
@@ -623,18 +626,15 @@ function private.HandleRequestDone(result)
 	private.requestResult = result
 	if TSMDBG then TSMDBG.Log("Scanner", "HandleRequestDone result=%s hasQuery=%s",
 		tostring(result), tostring(private.query ~= nil)) end
-	-- 3.3.5 local DB: запись данных скана делается ТУТ, после успешного browse,
-	-- ровно один раз на скан. _UpdateData в ScrollTable дёргается на любой
-	-- render-update и для записи не годится.
-	-- Only complete, unfiltered price views may update AuctionDB. Operation/UI
-	-- filters are allowed to shape decisions, but must not become market
-	-- observations or clear live prices by absence.
-	if result and private.query and private.query:CanRecordAuctionDB() and _G.TSM_AuctionDB_RecordScan then
-		local ok, err = pcall(private.RecordScanResults, private.query)
+	-- Persist the raw Classic market snapshot only after the browse completed
+	-- successfully. Prices were captured before client-side operation/UI filters,
+	-- so those filters cannot poison DBMinBuyout / DBRecent.
+	if result and private.query and private.query:CanRecordAuctionDB() then
+		local ok, err = pcall(private.FlushAuctionDBScan)
 		if not ok and _G.TSMDebugDB then
 			_G.TSMDebugDB.auctiondb_local = _G.TSMDebugDB.auctiondb_local or {}
-			table.insert(_G.TSMDebugDB.auctiondb_local, "RecordScanResults ERR: "..tostring(err))
-			if TSMDBG then TSMDBG.Warn("Scanner", "RecordScanResults ERR: %s", tostring(err)) end
+			table.insert(_G.TSMDebugDB.auctiondb_local, "FlushAuctionDBScan ERR: "..tostring(err))
+			if TSMDBG then TSMDBG.Warn("Scanner", "FlushAuctionDBScan ERR: %s", tostring(err)) end
 		end
 	end
 	-- Delay a bit so that we complete our current FSM transition
@@ -644,82 +644,83 @@ end
 -- 3.3.5: записать сводку browse-скана в локальную DB (TradeSkillMaster_AuctionDB).
 -- Собирает minBuyout / marketValue / numAuctions per baseItemString и зовёт
 -- _G.TSM_AuctionDB_RecordScan({[is]={mb=N, mv=N, na=N}}).
-function private.RecordScanResults(query)
-	local scanData = {}
-	local count = 0
-	local prices = {}
+function private.StartAuctionDBScan(query)
+	private.auctionDBScanData = nil
+	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) or not query:CanRecordAuctionDB() then
+		return
+	end
 
-	-- Only an explicit, unfiltered base-item list gives us a finite scope where
-	-- absence is meaningful. ItemIterator yields the item string as its sole
-	-- value, so use a single loop variable.
+	local data = {}
 	if query:CanInvalidateMissingAuctionDBItems() then
 		for itemString in query:ItemIterator() do
 			local baseItemString = ItemString.GetBaseFast(itemString)
-			if baseItemString and itemString == baseItemString and not scanData[baseItemString] then
-				scanData[baseItemString] = { clearLive = true, na = 0, nsamples = 0 }
-				count = count + 1
+			if baseItemString and itemString == baseItemString then
+				data[baseItemString] = { na = 0, prices = {} }
 			end
 		end
 	end
+	private.auctionDBScanData = data
+end
 
-	for baseItemString, row in query:BrowseResultsIterator() do
-		local minBuyout, auctionCount = nil, 0
-		wipe(prices)
-		for _, subRow in row:SubRowIterator() do
-			if subRow.HasRawData and subRow:HasRawData() then
-				local _, itemBuyout = subRow:GetBuyouts()
-				local _, numAuctions = subRow:GetQuantities()
-				if itemBuyout and itemBuyout > 0 then
-					if not minBuyout or itemBuyout < minBuyout then
-						minBuyout = itemBuyout
-					end
-					-- One sample per auction lot (not per item in the stack), matching
-					-- the original TSM market-value sampling semantics.
-					for _ = 1, numAuctions do
-						prices[#prices + 1] = itemBuyout
-					end
-				end
-				auctionCount = auctionCount + numAuctions
-			end
+function private.RecordAuctionDBResult(baseItemString, stackSize, buyout)
+	local scanData = private.auctionDBScanData
+	if not scanData then
+		return
+	end
+	local data = scanData[baseItemString]
+	if not data then
+		data = { na = 0, prices = {} }
+		scanData[baseItemString] = data
+	end
+	data.na = data.na + 1
+	if buyout and buyout > 0 and stackSize and stackSize > 0 then
+		local itemBuyout = math.floor(buyout / stackSize)
+		if itemBuyout > 0 then
+			data.mb = data.mb and math.min(data.mb, itemBuyout) or itemBuyout
+			data.prices[#data.prices + 1] = itemBuyout
 		end
+	end
+end
 
-		local data = scanData[baseItemString]
-		if not data then
-			data = {}
-			scanData[baseItemString] = data
-			count = count + 1
-		end
-		data.na = auctionCount
-		data.nsamples = #prices
-		if minBuyout and minBuyout > 0 then
-			data.clearLive = nil
-			data.mb = minBuyout
-			data.mv = ScanUtil.CalcMarketValue(prices) or minBuyout
+function private.FlushAuctionDBScan()
+	local rawData = private.auctionDBScanData
+	private.auctionDBScanData = nil
+	if not rawData or not _G.TSM_AuctionDB_RecordScan then
+		return
+	end
+
+	local scanData = {}
+	local count = 0
+	for itemString, data in pairs(rawData) do
+		local prices = data.prices
+		local record = {
+			na = data.na,
+			nsamples = #prices,
+		}
+		if data.mb and data.mb > 0 then
+			record.mb = data.mb
+			record.mv = ScanUtil.CalcMarketValue(prices) or data.mb
 		else
-			-- The row itself was observed by an authoritative scan, but there was
-			-- no priced auction in it. Persist that fact instead of retaining an
-			-- older DBMinBuyout / DBRecent value.
-			data.clearLive = true
-			data.mb = nil
-			data.mv = nil
+			record.clearLive = true
 		end
+		scanData[itemString] = record
+		count = count + 1
 	end
 
-	if count > 0 then
-		_G.TSM_AuctionDB_RecordScan(scanData)
-		-- Also feed the in-memory holder so the new snapshot is visible
-		-- immediately rather than only after the next /reload.
-		if _G.TSM_AuctionDB_RecordLocalScanResults then
-			_G.TSM_AuctionDB_RecordLocalScanResults(scanData)
+	if count == 0 then
+		return
+	end
+	_G.TSM_AuctionDB_RecordScan(scanData)
+	if _G.TSM_AuctionDB_RecordLocalScanResults then
+		_G.TSM_AuctionDB_RecordLocalScanResults(scanData)
+	end
+	if _G.TSMDebugDB then
+		_G.TSMDebugDB.auctiondb_local = _G.TSMDebugDB.auctiondb_local or {}
+		local log = _G.TSMDebugDB.auctiondb_local
+		while #log > 200 do
+			table.remove(log, 1)
 		end
-		if _G.TSMDebugDB then
-			_G.TSMDebugDB.auctiondb_local = _G.TSMDebugDB.auctiondb_local or {}
-			local log = _G.TSMDebugDB.auctiondb_local
-			while #log > 200 do
-				table.remove(log, 1)
-			end
-			table.insert(log, string.format("[%s] RecordScan items=%d", date("%H:%M:%S"), count))
-		end
+		table.insert(log, string.format("[%s] RecordScan items=%d", date("%H:%M:%S"), count))
 	end
 end
 
@@ -892,6 +893,9 @@ function private.ProcessBrowseResultClassic(index)
 		end
 		seller = "?"
 	end
+	-- Capture the raw lot before _FilterBrowseResults applies Shopping /
+	-- Auctioning filters. Each Classic list index is one auction lot.
+	private.RecordAuctionDBResult(baseItemString, stackSize, buyout)
 	private.query:_ProcessBrowseResult(baseItemString, itemLink)
 	private.query:_MarkDirtyRow(baseItemString)
 	local row = private.query:_GetBrowseResults(baseItemString)
