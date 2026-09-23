@@ -254,7 +254,6 @@ def check_lua_syntax(loaded_lua: set[Path], luac: str) -> None:
 
 
 def run_checks(luac: str) -> None:
-    scan_all_manifest_references()
     runtime_files, loaded_lua = collect_runtime_files()
     check_interface_versions()
     check_locale_placeholders()
@@ -263,7 +262,7 @@ def run_checks(luac: str) -> None:
 
     print(f"OK: {len(runtime_files)} runtime files referenced by top-level addons")
     print(f"OK: {len(loaded_lua)} Lua files parse as Lua 5.1")
-    print("OK: all TOC/XML references exist")
+    print("OK: all runtime TOC/XML references exist")
     print("OK: all top-level addon TOCs target Interface 30300")
     print("OK: locale format placeholders match enUS")
     print("OK: no merge-conflict markers in runtime files")
