@@ -639,28 +639,23 @@ end
 -- the first nil GetItemInfo result (which disproportionately hid old gear).
 function private.FinalizeClassicResults(auctionScan)
 	local deadline = GetTime() + CLASSIC_ITEM_INFO_RETRY_SECONDS
-	while true do
-		-- A pending row may already have cached a nil Destroy value while its item
-		-- metadata was cold (for example when the UI rendered the value column).
-		-- Re-evaluate after metadata loads instead of letting that transient nil
-		-- survive for the rest of the scan.
-		CustomString.InvalidateCache("Destroy")
-		local pending = {}
-		local remove = {}
-		for _, query in auctionScan:QueryIterator() do
-			for _, row in query:BrowseResultsIterator() do
-				for _, subRow in row:SubRowIterator() do
-					local reason = private.GetClassicFilterReason(subRow)
-					if reason == "pending" then
-						tinsert(pending, subRow)
-					elseif reason ~= "ok" then
-						tinsert(remove, { subRow, reason })
-					end
-				end
-			end
-		end
+	local pending = {}
+	local remove = {}
 
-		for _, info in ipairs(remove) do
+	local function Evaluate(subRow, pendingRows, removeRows)
+		if not subRow:GetResultRow() then
+			return
+		end
+		local reason = private.GetClassicFilterReason(subRow)
+		if reason == "pending" then
+			tinsert(pendingRows, subRow)
+		elseif reason ~= "ok" then
+			tinsert(removeRows, { subRow, reason })
+		end
+	end
+
+	local function RemoveRows(rows)
+		for _, info in ipairs(rows) do
 			local subRow, reason = info[1], info[2]
 			local resultRow = subRow:GetResultRow()
 			if resultRow then
@@ -670,20 +665,40 @@ function private.FinalizeClassicResults(auctionScan)
 				end
 			end
 		end
+	end
 
-		if #pending == 0 then
-			return
-		elseif GetTime() >= deadline then
-			for _, subRow in ipairs(pending) do
-				local resultRow = subRow:GetResultRow()
-				if resultRow then
-					resultRow:RemoveSubRow(subRow)
-					private.filterStats.unresolved = private.filterStats.unresolved + 1
-				end
+	-- The value column may have evaluated Destroy while item metadata was cold.
+	-- Clear that transient nil once before the authoritative post-scan pass.
+	CustomString.InvalidateCache("Destroy")
+	for _, query in auctionScan:QueryIterator() do
+		for _, row in query:BrowseResultsIterator() do
+			for _, subRow in row:SubRowIterator() do
+				Evaluate(subRow, pending, remove)
 			end
-			return
 		end
+	end
+	RemoveRows(remove)
+
+	-- Retry only unresolved rows. This keeps the cold-cache fix bounded without
+	-- repeatedly recalculating every already-valid result.
+	while #pending > 0 and GetTime() < deadline do
 		Threading.Sleep(CLASSIC_ITEM_INFO_RETRY_INTERVAL)
+		CustomString.InvalidateCache("Destroy")
+		local nextPending = {}
+		local retryRemove = {}
+		for _, subRow in ipairs(pending) do
+			Evaluate(subRow, nextPending, retryRemove)
+		end
+		RemoveRows(retryRemove)
+		pending = nextPending
+	end
+
+	for _, subRow in ipairs(pending) do
+		local resultRow = subRow:GetResultRow()
+		if resultRow then
+			resultRow:RemoveSubRow(subRow)
+			private.filterStats.unresolved = private.filterStats.unresolved + 1
+		end
 	end
 end
 
