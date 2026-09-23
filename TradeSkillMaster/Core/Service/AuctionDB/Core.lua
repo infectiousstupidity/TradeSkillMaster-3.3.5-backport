@@ -81,6 +81,61 @@ do
 end
 
 
+-- Stores one local AuctionDB record in the shared in-memory holder.
+-- A table record is an authoritative current snapshot: missing / zero live-price
+-- fields mean "no current priced auction", while DBMarket / DBHistorical remain
+-- independent rolling aggregates.
+---@param itemString string
+---@param record number|table
+---@param defaultTimestamp? number
+---@return boolean stored
+---@return number? timestamp
+function private.StoreLocalScanRecord(itemString, record, defaultTimestamp)
+	if type(record) == "number" then
+		record = { mb = record }
+	elseif type(record) ~= "table" then
+		return false
+	end
+
+	local mb = record.mb or record.minBuyout
+	local mv = record.mv or record.marketValue
+	local na = record.na or record.numAuctions
+	local mkt = record.mkt
+	local hist = record.hist
+	local ts = record.ts
+	local scanSamples = record.ns or record.scanSamples
+	local marketDays = record.mktDays or record.marketDays
+	local historicalDays = record.histDays or record.historicalDays
+
+	mb = (type(mb) == "number" and mb > 0) and mb or nil
+	mv = (type(mv) == "number" and mv > 0) and mv or mb
+	na = (type(na) == "number" and na >= 0) and na or (mb and 1 or nil)
+	mkt = (type(mkt) == "number" and mkt > 0) and mkt or nil
+	hist = (type(hist) == "number" and hist > 0) and hist or nil
+	ts = (type(ts) == "number" and ts > 0) and ts or defaultTimestamp
+	scanSamples = (type(scanSamples) == "number" and scanSamples >= 0) and scanSamples or nil
+	marketDays = (type(marketDays) == "number" and marketDays >= 0) and marketDays or nil
+	historicalDays = (type(historicalDays) == "number" and historicalDays >= 0) and historicalDays or nil
+
+	if not mb and not mv and na == nil and not mkt and not hist and not ts and scanSamples == nil then
+		return false
+	end
+
+	private.localHolder.itemLookup[itemString] = {
+		mb,
+		mv,
+		na,
+		mkt,
+		hist,
+		ts,
+		scanSamples,
+		marketDays,
+		historicalDays,
+	}
+	return true, ts
+end
+
+
 
 -- ============================================================================
 -- Module Functions
@@ -106,51 +161,22 @@ function AuctionDB.OnEnable()
 		private.LoadRegionRealmAppData(private.altRealmData, commodityData)
 	end
 
-	-- 3.3.5: Load local scan data from TradeSkillMaster_AuctionDB addon
-	-- (separate SavedVariable file, written by Scanner.HandleRequestDone).
-	-- Schema v4: items[is] = {mb, mv, na, ts, mkt, hist, snaps, mktRing, ...}
+	-- 3.3.5: Load local scan data from TradeSkillMaster_AuctionDB addon.
+	-- Live price fields may legitimately be empty after an authoritative scan
+	-- found no priced auctions; rolling market / historical data is preserved.
 	if _G.TSM_AuctionDB_GetRealmData and private.localHolder then
 		local localData = _G.TSM_AuctionDB_GetRealmData()
 		local count = 0
 		local maxTs = 0
 		for itemString, record in pairs(localData) do
-			local mb, mv, na, ts, mkt, hist, scanSamples, marketDays, historicalDays
-			if type(record) == "number" then
-				mb = record
-			elseif type(record) == "table" then
-				mb             = record.mb   or record.minBuyout
-				mv             = record.mv   or record.marketValue
-				na             = record.na   or record.numAuctions
-				ts             = record.ts
-				mkt            = record.mkt
-				hist           = record.hist
-				scanSamples    = record.ns or record.scanSamples
-				marketDays     = record.mktDays or record.marketDays
-				historicalDays = record.histDays or record.historicalDays
-			end
-			if type(mb) == "number" and mb > 0 then
-				local mvVal  = (type(mv)   == "number" and mv   > 0) and mv   or mb
-				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or nil
-				local hvVal  = (type(hist) == "number" and hist > 0) and hist or nil
-				private.localHolder.itemLookup[itemString] = {
-					mb,
-					mvVal,
-					(type(na) == "number" and na > 0) and na or 1,
-					mktVal,
-					hvVal,
-					(type(ts) == "number" and ts > 0) and ts or nil,
-					(type(scanSamples) == "number" and scanSamples >= 0) and scanSamples or nil,
-					(type(marketDays) == "number" and marketDays >= 0) and marketDays or nil,
-					(type(historicalDays) == "number" and historicalDays >= 0) and historicalDays or nil,
-				}
+			local stored, ts = private.StoreLocalScanRecord(itemString, record)
+			if stored then
 				count = count + 1
-				if type(ts) == "number" and ts > maxTs then
+				if ts and ts > maxTs then
 					maxTs = ts
 				end
 			end
 		end
-		-- 3.3.5: запомнить самое свежее время скана из локальной БД, чтобы
-		-- тултип показывал "X auctions (… ago)", а не "Not Scanned".
 		if maxTs > 0 then
 			private.localScanTime = maxTs
 		end
@@ -295,43 +321,20 @@ end
 function AuctionDB.RecordLocalScanResults(results)
 	if type(results) ~= "table" or not private.localHolder then return end
 	local count = 0
-	-- v4: TSM_AuctionDB_RecordScan annotates each data table with mkt/hist after
-	-- computing weighted DBMarket and 60-day DBHistorical from daily rings.
+	local maxTs = private.localScanTime or 0
+	local now = time()
 	for itemString, data in pairs(results) do
 		itemString = ItemString.Get(itemString) or itemString
-		if type(data) == "table" then
-			local mb             = data.mb  or data.minBuyout
-			local mv             = data.mv  or data.marketValue
-			local na             = data.na  or data.numAuctions
-			local mkt            = data.mkt
-			local hist           = data.hist
-			local ts             = data.ts
-			local scanSamples    = data.scanSamples or data.nsamples
-			local marketDays     = data.marketDays
-			local historicalDays = data.historicalDays
-			if type(mb) == "number" and mb > 0 then
-				local mvVal  = (type(mv)   == "number" and mv   > 0) and mv   or mb
-				local mktVal = (type(mkt)  == "number" and mkt  > 0) and mkt  or nil
-				local hvVal  = (type(hist) == "number" and hist > 0) and hist or nil
-				private.localHolder.itemLookup[itemString] = {
-					mb,
-					mvVal,
-					(type(na) == "number" and na > 0) and na or 1,
-					mktVal,
-					hvVal,
-					(type(ts) == "number" and ts > 0) and ts or time(),
-					(type(scanSamples) == "number" and scanSamples >= 0) and scanSamples or nil,
-					(type(marketDays) == "number" and marketDays >= 0) and marketDays or nil,
-					(type(historicalDays) == "number" and historicalDays >= 0) and historicalDays or nil,
-				}
-				count = count + 1
+		local stored, ts = private.StoreLocalScanRecord(itemString, data, now)
+		if stored then
+			count = count + 1
+			if ts and ts > maxTs then
+				maxTs = ts
 			end
 		end
 	end
 	if count > 0 then
-		-- 3.3.5: отметить время скана, чтобы тултип ушёл с "Not Scanned"
-		-- сразу после поиска/скана, без /reload.
-		private.localScanTime = time()
+		private.localScanTime = maxTs
 		CustomString.InvalidateCache("DBMarket")
 		CustomString.InvalidateCache("DBAdaptive")
 		CustomString.InvalidateCache("DBMinBuyout")
