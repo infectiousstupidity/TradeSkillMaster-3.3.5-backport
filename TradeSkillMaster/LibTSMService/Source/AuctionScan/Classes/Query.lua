@@ -570,6 +570,47 @@ function AuctionQuery:ItemIterator()
 	return private.ItemIteratorHelper, self._items, nil
 end
 
+---Returns whether this query's retained rows are safe to use as AuctionDB
+---price observations. AuctionDB must never learn from a partial scan, a
+---price/result-filtered view, or a variant-only view of a base item.
+---@return boolean
+function AuctionQuery:CanRecordAuctionDB()
+	if self._accumulate or self._specifiedPage ~= nil or self._browseEndedEarly then
+		return false
+	end
+	if self._minQuality ~= -math.huge or self._maxQuality ~= math.huge then
+		return false
+	end
+	if self._minLevel ~= -math.huge or self._maxLevel ~= math.huge then
+		return false
+	end
+	if self._minItemLevel ~= -math.huge or self._maxItemLevel ~= math.huge then
+		return false
+	end
+	if self._class ~= FILTER_NOT_SET or self._subClass ~= FILTER_NOT_SET or self._invType ~= FILTER_NOT_SET then
+		return false
+	end
+	if self._usable or self._uncollected or self._upgrades or self._unlearned or self._canLearn then
+		return false
+	end
+	if self._minPrice ~= 0 or self._maxPrice ~= math.huge or next(self._customFilters) then
+		return false
+	end
+	for itemString, itemType in pairs(self._items) do
+		if itemType == ITEM_SPECIFIC and itemString ~= ItemString.GetBaseFast(itemString) then
+			return false
+		end
+	end
+	return true
+end
+
+---Returns whether an explicit requested item which is absent from the completed
+---result set can authoritatively clear its live AuctionDB price.
+---@return boolean
+function AuctionQuery:CanInvalidateMissingAuctionDBItems()
+	return self:CanRecordAuctionDB() and next(self._items) ~= nil
+end
+
 ---Wipes the browse results.
 function AuctionQuery:WipeBrowseResults()
 	for _, row in pairs(self._browseResults) do

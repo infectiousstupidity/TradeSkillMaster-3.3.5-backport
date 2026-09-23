@@ -626,21 +626,10 @@ function private.HandleRequestDone(result)
 	-- 3.3.5 local DB: запись данных скана делается ТУТ, после успешного browse,
 	-- ровно один раз на скан. _UpdateData в ScrollTable дёргается на любой
 	-- render-update и для записи не годится.
-	-- 3.3.5 ROOT-FIX (Sniper "лот появляется и через 5 сек пропадает"):
-	-- НЕ записываем в AuctionDB результаты частичного скана. Sniper сканирует
-	-- ТОЛЬКО последнюю страницу (SetPage("LAST") + SetAccumulate) — это по
-	-- определению самые дешёвые/недооценённые лоты. Запись их в DBMarket/
-	-- DBMinBuyout каждые 5 сек занижает рыночную цену → SniperOperation.GetMaxPrice
-	-- (порог снайпа) падает → на следующем проходе лот больше не проходит порог
-	-- и ИСЧЕЗАЕТ из списка (само-отравление рынка по таймеру рескана). Полные
-	-- сканы и поиск по одному предмету (без _specifiedPage/_accumulate) пишутся
-	-- как раньше.
-	local isPartialScan = private.query and (
-		private.query._accumulate
-		or private.query._specifiedPage ~= nil
-		or private.query._browseEndedEarly
-	)
-	if result and private.query and not isPartialScan and _G.TSM_AuctionDB_RecordScan then
+	-- Only complete, unfiltered price views may update AuctionDB. Operation/UI
+	-- filters are allowed to shape decisions, but must not become market
+	-- observations or clear live prices by absence.
+	if result and private.query and private.query:CanRecordAuctionDB() and _G.TSM_AuctionDB_RecordScan then
 		local ok, err = pcall(private.RecordScanResults, private.query)
 		if not ok and _G.TSMDebugDB then
 			_G.TSMDebugDB.auctiondb_local = _G.TSMDebugDB.auctiondb_local or {}
@@ -660,26 +649,20 @@ function private.RecordScanResults(query)
 	local count = 0
 	local prices = {}
 
-	-- An explicit item list defines an authoritative scan scope. Seed every
-	-- requested base item with an empty current snapshot so a successful query
-	-- which finds no priced auctions clears stale DBMinBuyout / DBRecent data.
-	-- Broad searches without SetItems() are not safe to invalidate by absence.
-	for _, itemString in query:ItemIterator() do
-		local baseItemString = ItemString.GetBaseFast(itemString)
-		if baseItemString and not scanData[baseItemString] then
-			scanData[baseItemString] = { na = 0, nsamples = 0 }
-			count = count + 1
+	-- Only an explicit, unfiltered base-item list gives us a finite scope where
+	-- absence is meaningful. ItemIterator yields the item string as its sole
+	-- value, so use a single loop variable.
+	if query:CanInvalidateMissingAuctionDBItems() then
+		for itemString in query:ItemIterator() do
+			local baseItemString = ItemString.GetBaseFast(itemString)
+			if baseItemString and itemString == baseItemString and not scanData[baseItemString] then
+				scanData[baseItemString] = { clearLive = true, na = 0, nsamples = 0 }
+				count = count + 1
+			end
 		end
 	end
 
 	for baseItemString, row in query:BrowseResultsIterator() do
-		local data = scanData[baseItemString]
-		if not data then
-			data = { na = 0, nsamples = 0 }
-			scanData[baseItemString] = data
-			count = count + 1
-		end
-
 		local minBuyout, auctionCount = nil, 0
 		wipe(prices)
 		for _, subRow in row:SubRowIterator() do
@@ -700,12 +683,23 @@ function private.RecordScanResults(query)
 			end
 		end
 
+		local data = scanData[baseItemString]
+		if not data then
+			data = {}
+			scanData[baseItemString] = data
+			count = count + 1
+		end
 		data.na = auctionCount
 		data.nsamples = #prices
 		if minBuyout and minBuyout > 0 then
+			data.clearLive = nil
 			data.mb = minBuyout
 			data.mv = ScanUtil.CalcMarketValue(prices) or minBuyout
 		else
+			-- The row itself was observed by an authoritative scan, but there was
+			-- no priced auction in it. Persist that fact instead of retaining an
+			-- older DBMinBuyout / DBRecent value.
+			data.clearLive = true
 			data.mb = nil
 			data.mv = nil
 		end
