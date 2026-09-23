@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-integrity:
+    name: Repository integrity / Lua 5.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+
+      - name: Validate runtime load graph, manifests, locales, and syntax
+        run: |
+          LUAC="$(command -v luac5.1 || command -v luac)"
+          python3 scripts/validate_repo.py check --luac "$LUAC"
+
+  static-analysis:
+    name: High-signal Lua static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1 liblua5.1-0-dev luarocks
+          sudo luarocks --lua-version=5.1 install luacheck 0.26.1-1
+
+      - name: Run high-signal Luacheck rules on runtime Lua
+        shell: bash
+        run: |
+          mapfile -t lua_files < <(python3 scripts/validate_repo.py list-lua)
+          luacheck "${lua_files[@]}" \
+            --config .luacheckrc \
+            --codes \
+            --only 221 321 341 411 511 531 532 571 582
+
+  shell-scripts:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        run: shellcheck scripts/*.sh
