@@ -112,6 +112,12 @@ end
 
 ---Releases the scan manager.
 function AuctionScanManager:Release()
+	-- A scan thread may be killed by the UI while it is blocked in Scanner.Browse().
+	-- Cancel the shared browse future before recycling this manager; otherwise the
+	-- Scanner remains busy and subsequent scans wait five seconds then fail to start.
+	if self._scanQuery then
+		self:Cancel()
+	end
 	self:_Release()
 	private.objectPool:Recycle(self)
 end

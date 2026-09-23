@@ -749,7 +749,12 @@ function AuctionHouseWrapper.SetSort(useEmptySorts, usePriceSort)
 	end
 
 	private.lastSortKey = sortKey
-	return true
+	-- SortAuctionApplySort can itself produce AUCTION_ITEM_LIST_UPDATE on 3.3.5.
+	-- Scanner treats that event as the completion signal for QueryAuctionItems, so
+	-- sending a query in the same transition risks accepting the sort refresh as the
+	-- query response. Return false once after a real sort change; Scanner retries
+	-- _SetSort after SORT_RETRY_DELAY, sees lastSortKey, and only then sends the query.
+	return false
 end
 
 ---Gets the deposit cost for an item by querying the AH APIs for it.
