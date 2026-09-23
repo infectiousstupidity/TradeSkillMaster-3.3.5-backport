@@ -142,6 +142,7 @@ Scanner:OnModuleLoad(function()
 				private.query = query
 				private.resolveSellers = resolveSellers
 				private.browseId = private.browseId + 1
+				query:_SetCurrentBrowseId(private.browseId)
 				private.browseIsNoScan = false
 				private.callback = callback
 				private.StartAuctionDBScan(query)
@@ -152,6 +153,7 @@ Scanner:OnModuleLoad(function()
 				assert(not private.query)
 				private.query = query
 				private.browseId = private.browseId + 1
+				query:_SetCurrentBrowseId(private.browseId)
 				private.browseIsNoScan = true
 				private.callback = callback
 				for _, itemKey in ipairs(itemKeys) do
