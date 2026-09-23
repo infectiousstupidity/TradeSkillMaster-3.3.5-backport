@@ -14,7 +14,19 @@ else
 	exit 1
 fi
 
+if [[ -n "${LUA:-}" ]]; then
+	lua_bin="$LUA"
+elif command -v lua5.1 >/dev/null 2>&1; then
+	lua_bin="$(command -v lua5.1)"
+elif command -v lua >/dev/null 2>&1; then
+	lua_bin="$(command -v lua)"
+else
+	echo "error: Lua interpreter not found (install Lua 5.1 or set LUA)" >&2
+	exit 1
+fi
+
 python3 scripts/validate_repo.py check --luac "$luac_bin"
+"$lua_bin" scripts/test-settings-migration.lua
 
 if command -v luacheck >/dev/null 2>&1; then
 	mapfile -t lua_files < <(python3 scripts/validate_repo.py list-lua)
