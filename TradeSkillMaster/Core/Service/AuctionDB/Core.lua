@@ -319,14 +319,16 @@ function AuctionDB.GetAdaptiveMarketValue(itemString)
 	return recentValue
 end
 
----Returns the established market value when available, otherwise the latest
----per-scan market snapshot. The fallback is intentionally allowed to use sparse
----evidence so callers can opt into useful pricing before DBMarket is established.
+---Returns the last known market value for compatibility-facing price sources.
+---Prefer the established rolling market, then the robust per-scan market value.
+---Unlike DBRecent / DBAdaptive, this deliberately ignores local freshness gates:
+---Auctioning validates custom prices before it scans, and DBMarket historically
+---remained usable between scans on this backport.
 ---@param itemString string
 ---@return number?
 function AuctionDB.GetMarketOrRecentValue(itemString)
-	local marketValue = AuctionDB.GetRealmItemData(itemString, "marketValue")
-	return marketValue or AuctionDB.GetRealmItemData(itemString, "marketValueRecent")
+	local marketValue = private.GetItemDataHelper(private.realmData.marketValue, "marketValue", itemString, true)
+	return marketValue or private.GetItemDataHelper(private.realmData.marketValueRecent, "marketValueRecent", itemString, true)
 end
 
 ---Записывает результаты локального browse-скана для использования как fallback
@@ -428,7 +430,7 @@ function private.LoadAppData(appData)
 	return result, metadata.downloadTime
 end
 
-function private.GetItemDataHelper(tbl, key, itemString)
+function private.GetItemDataHelper(tbl, key, itemString, ignoreLocalAge)
 	if not itemString or not tbl then
 		return nil
 	end
@@ -447,7 +449,7 @@ function private.GetItemDataHelper(tbl, key, itemString)
 	end
 	local data = private.UnpackData(tbl, itemString)
 	if not data then return nil end
-	if tbl == private.localHolder then
+	if tbl == private.localHolder and not ignoreLocalAge then
 		local maxAge = LOCAL_FIELD_MAX_AGE[key]
 		if maxAge then
 			local lastScanIndex = tbl.fieldLookup.lastScan
