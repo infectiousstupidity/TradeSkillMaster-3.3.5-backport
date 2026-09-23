@@ -6,6 +6,7 @@
   <img src="https://img.shields.io/badge/TSM-v4.14.66-ff8800?style=for-the-badge&logo=appveyor">
   <img src="https://img.shields.io/badge/WotLK-3.3.5a-blue?style=for-the-badge">
   <img src="https://img.shields.io/badge/status-stable-brightgreen?style=for-the-badge">
+  <a href="https://github.com/infectiousstupidity/TradeSkillMaster-3.3.5-backport/actions/workflows/ci.yml"><img src="https://github.com/infectiousstupidity/TradeSkillMaster-3.3.5-backport/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
 </p>
 
 <h1 align="center">TradeSkillMaster — WotLK 3.3.5a backport</h1>
