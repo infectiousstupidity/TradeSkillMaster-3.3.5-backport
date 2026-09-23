@@ -47,7 +47,8 @@ def parse_toc_references(path: Path) -> list[str]:
 
 
 def parse_xml_references(path: Path) -> list[str]:
-    return [match.group(2) for match in XML_REF_RE.finditer(read_text(path))]
+    text = re.sub(r"<!--.*?-->", "", read_text(path), flags=re.DOTALL)
+    return [match.group(2) for match in XML_REF_RE.finditer(text)]
 
 
 def validate_reference(owner: Path, raw_reference: str) -> Path:
