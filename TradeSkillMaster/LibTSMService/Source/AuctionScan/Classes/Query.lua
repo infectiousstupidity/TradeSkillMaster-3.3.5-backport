@@ -570,9 +570,9 @@ function AuctionQuery:ItemIterator()
 	return private.ItemIteratorHelper, self._items, nil
 end
 
----Returns whether this query's retained rows are safe to use as AuctionDB
----price observations. AuctionDB must never learn from a partial scan, a
----price/result-filtered view, or a variant-only view of a base item.
+---Returns whether this Classic browse is complete enough to contribute raw
+---AuctionDB observations. Client-side custom filters are intentionally ignored:
+---Scanner captures prices before those filters mutate the result set.
 ---@return boolean
 function AuctionQuery:CanRecordAuctionDB()
 	if self._accumulate or self._specifiedPage ~= nil or self._browseEndedEarly then
@@ -593,7 +593,7 @@ function AuctionQuery:CanRecordAuctionDB()
 	if self._usable or self._uncollected or self._upgrades or self._unlearned or self._canLearn then
 		return false
 	end
-	if self._minPrice ~= 0 or self._maxPrice ~= math.huge or next(self._customFilters) then
+	if self._minPrice ~= 0 or self._maxPrice ~= math.huge then
 		return false
 	end
 	for itemString, itemType in pairs(self._items) do
