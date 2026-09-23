@@ -519,47 +519,6 @@ function private.QueryBuyoutFilter(_, row)
 	return (itemBuyout and itemBuyout == 0) or (minItemBuyout and minItemBuyout == 0)
 end
 
-function private.QueryIsBrowseDoneFunction(query)
-	if not ClientInfo.IsVanillaClassic() and not ClientInfo.IsBCClassic() and not ClientInfo.IsWrathClassic() then
-		return false
-	end
-	local isDone = true
-	for itemString in query:ItemIterator() do
-		isDone = isDone and private.QueryIsBrowseDoneForItem(query, itemString)
-	end
-	return isDone
-end
-
-function private.QueryIsBrowseDoneForItem(query, itemString)
-	local groupPath = Group.GetPathByItem(itemString)
-	if not groupPath then
-		return true
-	end
-	local isFilterDone = true
-	for _, _, operationSettings in GroupOperation.OperationIterator(groupPath, "Auctioning") do
-		if isFilterDone then
-			local numBuyouts, minItemBuyout, maxItemBuyout = 0, nil, nil
-			for _, subRow in query:ItemSubRowIterator(itemString) do
-				local _, itemBuyout = subRow:GetBuyouts()
-				local timeLeft = subRow:GetListingInfo()
-				local quantity = subRow:GetQuantities()
-				if not AuctioningOperation.IsAuctionFiltered(itemString, operationSettings, itemBuyout, quantity, timeLeft) then
-					numBuyouts = numBuyouts + 1
-					minItemBuyout = min(minItemBuyout or math.huge, itemBuyout)
-					maxItemBuyout = max(maxItemBuyout or 0, itemBuyout)
-				end
-			end
-			if numBuyouts <= 1 then
-				-- There is only one distinct item buyout, so can't stop yet
-				isFilterDone = false
-			elseif AuctioningOperation.ShouldKeepScanningForPosting(itemString, operationSettings, minItemBuyout, maxItemBuyout) then
-				isFilterDone = false
-			end
-		end
-	end
-	return isFilterDone
-end
-
 function private.AuctionScanOnQueryDone(_, query)
 	for itemString in query:ItemIterator() do
 		local groupPath = Group.GetPathByItem(itemString)
